@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(yarn install:*)",
+      "Bash(yarn dev:*)",
+      "Bash(curl:*)",
+      "Bash(lsof:*)",
+      "Bash(netstat:*)",
+      "Bash(taskkill:*)",
+      "Bash(gh repo:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(npm install:*)",
+      "Bash(dmux:*)",
+      "Bash(claude chat:*)",
+      "Bash(git clone:*)",
+      "Bash(claude stream:*)",
+      "Bash(claude api:*)",
+      "Bash(claude mcp:*)",
+      "Bash(claude plugin:*)",
+      "Bash(claude agents:*)",
+      "Bash(claude:*)",
+      "WebSearch",
+      "Bash(cygpath:*)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:docs.claude.com)",
+      "WebFetch(domain:agnt.gg)",
+      "Bash(npx next:*)",
+      "Bash(rm:*)",
+      "Bash(npx tsc:*)",
+      "Bash(tasklist:*)",
+      "Bash(CLAUDECODE= claude:*)",
+      "Bash(node:*)"
+    ]
+  }
+}
