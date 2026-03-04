@@ -12,6 +12,7 @@ const VALID_EMOTIONS = [
   "confused",
   "hungry",
   "mischievous",
+  "solshine",
 ] as const;
 
 type Emotion = (typeof VALID_EMOTIONS)[number];

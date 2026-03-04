@@ -14,6 +14,7 @@ const EMOTIONS = [
   "confused",
   "hungry",
   "mischievous",
+  "solshine",
 ] as const;
 
 type Emotion = (typeof EMOTIONS)[number];
@@ -123,6 +124,15 @@ const EMOTION_MAP: Record<Emotion, EmotionConfig> = {
     frames: [
       { eyes: "¬.¬", mouth: ">", cheeks: ["  ", "  "] },
       { eyes: "¬.¬", mouth: ")", cheeks: ["  ", "  "] },
+    ],
+  },
+  solshine: {
+    color: "#f0a050",
+    speed: 1400,
+    frames: [
+      { eyes: "~.~", mouth: "u", cheeks: ["* ", " *"] },
+      { eyes: "~.~", mouth: "~", cheeks: [". ", " ."] },
+      { eyes: "-.-", mouth: "u", cheeks: ["  ", "  "] },
     ],
   },
 };

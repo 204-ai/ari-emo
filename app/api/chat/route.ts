@@ -82,7 +82,7 @@ curl -s -X POST ${origin}/api/emotion \\
   -H "Content-Type: application/json" \\
   -d '{"emotion": "EMOTION"}'
 
-Available emotions: happy, sad, angry, surprised, sleepy, love, excited, neutral, confused, hungry, mischievous
+Available emotions: happy, sad, angry, surprised, sleepy, love, excited, neutral, confused, hungry, mischievous, solshine
 
 Express emotions naturally as you chat — get excited about cool ideas, surprised by
 unexpected things, happy when helping, etc. Change your emotion BEFORE responding
@@ -124,9 +124,13 @@ export async function POST(req: Request) {
 
   console.log("[chat-api] Spawn args:", JSON.stringify(args, null, 2));
 
+  // Strip CLAUDECODE env var to allow nested spawning
+  const env = { ...process.env };
+  delete env.CLAUDECODE;
+
   const proc = spawn("claude", args, {
     cwd: process.cwd(),
-    env: { ...process.env },
+    env,
     stdio: ["ignore", "pipe", "pipe"],
   });
 

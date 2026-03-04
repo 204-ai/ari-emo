@@ -53,7 +53,22 @@ export default function ChatPane() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [liveTranscript, setLiveTranscript] = useState("");
   const abortRef = useRef<AbortController | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const liveTranscriptRef = useRef("");
+  const speechRecRef = useRef<SpeechRecognition | null>(null);
+  const hasSpeechAPIRef = useRef(false);
+  const [ttsEnabled, setTtsEnabled] = useState(true);
+  const ttsEnabledRef = useRef(true);
+  const ttsAudioRef = useRef<HTMLAudioElement | null>(null);
+  const ttsQueueRef = useRef<{ url: string; audio: HTMLAudioElement }[]>([]);
+  const ttsPlayingRef = useRef(false);
+  const ttsSentIndexRef = useRef(0);
+  const ttsChainRef = useRef<Promise<void>>(Promise.resolve());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -112,10 +127,261 @@ export default function ChatPane() {
     }
   };
 
+  // ── Voice recording with real-time transcription ─────────────────
+
+  const updateLiveTranscript = (text: string) => {
+    liveTranscriptRef.current = text;
+    setLiveTranscript(text);
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+      mediaRecorderRef.current = mediaRecorder;
+      chunksRef.current = [];
+      updateLiveTranscript("");
+      hasSpeechAPIRef.current = false;
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+
+        // Stop speech recognition if running
+        if (speechRecRef.current) {
+          speechRecRef.current.stop();
+          speechRecRef.current = null;
+        }
+
+        const transcript = liveTranscriptRef.current.trim();
+
+        // If Web Speech API gave us text, auto-send it directly
+        if (hasSpeechAPIRef.current && transcript) {
+          updateLiveTranscript("");
+          sendMessage(transcript);
+          return;
+        }
+
+        // Fallback: transcribe via Whisper server, then auto-send
+        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        if (blob.size === 0) {
+          updateLiveTranscript("");
+          return;
+        }
+
+        setIsTranscribing(true);
+        try {
+          const formData = new FormData();
+          formData.append("file", blob, "recording.webm");
+          const res = await fetch("/api/transcribe", { method: "POST", body: formData });
+          if (!res.ok) throw new Error(`Transcription failed: ${res.status}`);
+          const data = await res.json();
+          if (data.text) {
+            sendMessage(data.text);
+          }
+        } catch (err) {
+          console.error("[voice] Transcription error:", err);
+        } finally {
+          setIsTranscribing(false);
+          updateLiveTranscript("");
+        }
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+
+      // Try Web Speech API for real-time preview
+      const SpeechRecognitionAPI =
+        (window as unknown as { SpeechRecognition?: typeof SpeechRecognition }).SpeechRecognition ||
+        (window as unknown as { webkitSpeechRecognition?: typeof SpeechRecognition }).webkitSpeechRecognition;
+
+      if (SpeechRecognitionAPI) {
+        const recognition = new SpeechRecognitionAPI();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+
+        recognition.onresult = (event: SpeechRecognitionEvent) => {
+          hasSpeechAPIRef.current = true;
+          let finalText = "";
+          let interimText = "";
+          for (let i = 0; i < event.results.length; i++) {
+            if (event.results[i].isFinal) {
+              finalText += event.results[i][0].transcript;
+            } else {
+              interimText += event.results[i][0].transcript;
+            }
+          }
+          updateLiveTranscript(finalText + interimText);
+        };
+
+        recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+          console.log("[voice] Speech recognition error:", event.error);
+        };
+
+        recognition.start();
+        speechRecRef.current = recognition;
+      }
+    } catch (err) {
+      console.error("[voice] Mic access error:", err);
+    }
+  };
+
+  const stopRecording = () => {
+    mediaRecorderRef.current?.stop();
+    mediaRecorderRef.current = null;
+    setIsRecording(false);
+  };
+
+  const toggleRecording = () => {
+    if (isRecording) stopRecording();
+    else startRecording();
+  };
+
+  // ── TTS playback (sentence-chunked queue) ────────────────────────
+
+  // Keep ref in sync with state so async callbacks see current value
+  useEffect(() => { ttsEnabledRef.current = ttsEnabled; }, [ttsEnabled]);
+
+  /** Play the next queued audio clip. Calls itself on `ended`. */
+  const playNextTTS = () => {
+    if (!ttsEnabledRef.current) {
+      // TTS was disabled — drain queue
+      for (const item of ttsQueueRef.current) URL.revokeObjectURL(item.url);
+      ttsQueueRef.current = [];
+      ttsPlayingRef.current = false;
+      return;
+    }
+
+    const next = ttsQueueRef.current.shift();
+    if (!next) {
+      ttsPlayingRef.current = false;
+      ttsAudioRef.current = null;
+      return;
+    }
+
+    ttsPlayingRef.current = true;
+    ttsAudioRef.current = next.audio;
+    next.audio.onended = () => {
+      URL.revokeObjectURL(next.url);
+      playNextTTS();
+    };
+    next.audio.onerror = () => {
+      URL.revokeObjectURL(next.url);
+      playNextTTS();
+    };
+    next.audio.play().catch(() => playNextTTS());
+  };
+
+  /** Clean markdown/written-text artifacts so TTS sounds natural. */
+  const sanitizeForSpeech = (text: string): string => {
+    let s = text;
+    // Remove code blocks entirely (``` ... ```)
+    s = s.replace(/```[\s\S]*?```/g, " code block ");
+    // Remove inline code backticks, keep the words
+    s = s.replace(/`([^`]*)`/g, "$1");
+    // Remove image markdown
+    s = s.replace(/!\[[^\]]*\]\([^)]+\)/g, "");
+    // Convert links to just the link text
+    s = s.replace(/\[([^\]]*)\]\([^)]+\)/g, "$1");
+    // Remove bold/italic markers
+    s = s.replace(/\*{1,3}([^*]+)\*{1,3}/g, "$1");
+    s = s.replace(/_{1,3}([^_]+)_{1,3}/g, "$1");
+    // Remove strikethrough
+    s = s.replace(/~~([^~]+)~~/g, "$1");
+    // Remove markdown headers (# ## ### etc.)
+    s = s.replace(/^#{1,6}\s+/gm, "");
+    // Remove bullet points and list markers
+    s = s.replace(/^[\s]*[-*+]\s+/gm, "");
+    s = s.replace(/^[\s]*\d+\.\s+/gm, "");
+    // Remove standalone URLs
+    s = s.replace(/https?:\/\/[^\s)]+/g, "");
+    // Remove horizontal rules
+    s = s.replace(/^[-*_]{3,}\s*$/gm, "");
+    // Remove blockquote markers
+    s = s.replace(/^>\s+/gm, "");
+    // Collapse multiple spaces/newlines
+    s = s.replace(/\s+/g, " ");
+    return s.trim();
+  };
+
+  /** Send a sentence to TTS and enqueue the resulting audio.
+   *  Fetches fire immediately (parallel) but the chain ensures
+   *  results are added to the playback queue in the correct order.
+   */
+  const enqueueTTS = (sentence: string) => {
+    if (!ttsEnabledRef.current || !sentence.trim()) return;
+
+    const cleaned = sanitizeForSpeech(sentence);
+    if (!cleaned) return;
+
+    // Fire the fetch immediately — don't wait for previous sentences
+    const audioPromise = fetch("/api/speak", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: cleaned, voice: "af_heart", speed: 1.0 }),
+    })
+      .then((res) => (res.ok ? res.blob() : null))
+      .then((blob) => {
+        if (!blob) return null;
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        return { url, audio };
+      })
+      .catch((err) => {
+        console.error("[tts] Fetch error:", err);
+        return null;
+      });
+
+    // Chain ensures enqueue order matches sentence order
+    ttsChainRef.current = ttsChainRef.current.then(async () => {
+      const result = await audioPromise;
+      if (!result || !ttsEnabledRef.current) return;
+
+      ttsQueueRef.current.push(result);
+      if (!ttsPlayingRef.current) playNextTTS();
+    });
+  };
+
+  /** Extract completed sentences from new text beyond sentIndex. */
+  const extractSentences = (fullText: string, sentIndex: number): { sentences: string[]; newIndex: number } => {
+    const newText = fullText.slice(sentIndex);
+    const sentences: string[] = [];
+    // Match sentences ending with . ! ? followed by space/newline, or end of a line
+    const re = /[^.!?\n]*[.!?](?=\s|$)|[^\n]+\n/g;
+    let match: RegExpExecArray | null;
+    let lastEnd = 0;
+
+    while ((match = re.exec(newText)) !== null) {
+      const sentence = match[0].trim();
+      if (sentence) sentences.push(sentence);
+      lastEnd = match.index + match[0].length;
+    }
+
+    return { sentences, newIndex: sentIndex + lastEnd };
+  };
+
+  /** Stop all TTS playback and clear the queue. */
+  const flushTTS = () => {
+    if (ttsAudioRef.current) {
+      ttsAudioRef.current.onended = null;
+      ttsAudioRef.current.onerror = null;
+      ttsAudioRef.current.pause();
+      ttsAudioRef.current = null;
+    }
+    for (const item of ttsQueueRef.current) URL.revokeObjectURL(item.url);
+    ttsQueueRef.current = [];
+    ttsPlayingRef.current = false;
+    ttsSentIndexRef.current = 0;
+    ttsChainRef.current = Promise.resolve();
+  };
+
   // ── Send message ──────────────────────────────────────────────────
 
-  const sendMessage = async () => {
-    const text = input.trim();
+  const sendMessage = async (overrideText?: string) => {
+    const text = (overrideText ?? input).trim();
     if ((!text && attachedFiles.length === 0) || isStreaming) return;
 
     const filesToSend = [...attachedFiles];
@@ -140,6 +406,9 @@ export default function ChatPane() {
 
     // Add empty assistant message to stream into
     setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+
+    // Reset TTS sentence tracking for new response
+    flushTTS();
 
     try {
       // Upload files first
@@ -219,6 +488,13 @@ export default function ChatPane() {
                   }
                   return updated;
                 });
+
+                // Detect completed sentences and enqueue TTS
+                const { sentences, newIndex } = extractSentences(textBlocks, ttsSentIndexRef.current);
+                ttsSentIndexRef.current = newIndex;
+                for (const sentence of sentences) {
+                  enqueueTTS(sentence);
+                }
               }
 
               const toolBlocks = (event.message.content || [])
@@ -259,6 +535,9 @@ export default function ChatPane() {
                   }
                   return updated;
                 });
+                // Enqueue any remaining text that wasn't a complete sentence
+                const remaining = resultText.slice(ttsSentIndexRef.current).trim();
+                if (remaining) enqueueTTS(remaining);
               }
             }
           } catch (parseErr) {
@@ -290,6 +569,7 @@ export default function ChatPane() {
   const stopStreaming = () => {
     console.log("[chat-ui] User interrupted streaming");
     abortRef.current?.abort();
+    flushTTS();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -302,8 +582,22 @@ export default function ChatPane() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-zinc-800">
+      <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-zinc-400">Chat with Ari</h2>
+        <button
+          onClick={() => {
+            setTtsEnabled((v) => !v);
+            flushTTS();
+          }}
+          className={`px-2 py-1 rounded text-xs transition-colors ${
+            ttsEnabled
+              ? "bg-zinc-700 text-zinc-200"
+              : "bg-zinc-800 text-zinc-500"
+          }`}
+          title={ttsEnabled ? "Mute Ari's voice" : "Unmute Ari's voice"}
+        >
+          {ttsEnabled ? "🔊" : "🔇"}
+        </button>
       </div>
 
       {/* Messages */}
@@ -346,6 +640,22 @@ export default function ChatPane() {
             </div>
           </div>
         ))}
+        {/* Live voice transcription bubble */}
+        {(isRecording || isTranscribing) && (
+          <div className="flex justify-end">
+            <div className="max-w-[85%] rounded-lg px-3 py-2 text-sm bg-zinc-700 text-zinc-100">
+              {isRecording && (
+                <span className="flex items-center gap-2">
+                  <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse flex-shrink-0" />
+                  <span>{liveTranscript || "Listening..."}</span>
+                </span>
+              )}
+              {isTranscribing && !isRecording && (
+                <span className="text-amber-400 animate-pulse">Transcribing...</span>
+              )}
+            </div>
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
 
@@ -421,6 +731,33 @@ export default function ChatPane() {
             >
               <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
             </svg>
+          </button>
+
+          {/* Mic button */}
+          <button
+            onClick={toggleRecording}
+            disabled={isTranscribing}
+            className={`px-2 py-2 rounded-lg text-sm transition-colors ${
+              isRecording
+                ? "bg-red-600 text-white animate-pulse"
+                : isTranscribing
+                ? "bg-zinc-800 text-amber-400"
+                : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200"
+            }`}
+            title={isRecording ? "Stop recording" : isTranscribing ? "Transcribing..." : "Voice input"}
+          >
+            {isTranscribing ? (
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin">
+                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill={isRecording ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                <line x1="12" y1="19" x2="12" y2="23" />
+                <line x1="8" y1="23" x2="16" y2="23" />
+              </svg>
+            )}
           </button>
 
           <textarea
