@@ -937,7 +937,7 @@ export default function ChatPane() {
             </button>
           ) : (
             <button
-              onClick={sendMessage}
+              onClick={() => sendMessage()}
               disabled={!input.trim() && attachedFiles.length === 0}
               className="px-4 py-2 bg-zinc-700 text-zinc-200 rounded-lg text-sm
                          hover:bg-zinc-600 disabled:opacity-40 disabled:cursor-not-allowed

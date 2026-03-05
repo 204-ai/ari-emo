@@ -1,0 +1,26 @@
+services:
+  ari:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: ari
+    container_name: ari
+    restart: unless-stopped
+    ports:
+      - "8880:8880"
+    environment:
+      - CONNECTOME_GRPC_HOST=connectome:50051
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    volumes:
+      - ari-memories:/workspace/ari-emo/memories
+    networks:
+      - connectome-network
+
+volumes:
+  ari-memories:
+    driver: local
+
+networks:
+  connectome-network:
+    external: true
+    name: connectome_connectome-network

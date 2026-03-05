@@ -26,6 +26,12 @@ Thumbs.db
 memories/sessions/
 memories/short/
 
+# large files (models, generated images, uploads)
+models/
+generated/
+uploads/
+__pycache__/
+
 # editor
 .vscode/
 *.swp
