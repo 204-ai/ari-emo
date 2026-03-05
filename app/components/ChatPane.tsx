@@ -9,6 +9,13 @@ interface Message {
   images?: string[];
 }
 
+interface HistorySession {
+  filename: string;
+  date: string;
+  summary: string;
+  messages: { role: "user" | "assistant"; content: string; time?: string }[];
+}
+
 /** Parse message content, rendering ![alt](url) as actual images. */
 function renderContent(content: string) {
   const parts = content.split(/(!\[[^\]]*\]\([^)]+\))/g);
@@ -70,8 +77,19 @@ export default function ChatPane() {
   const ttsSentIndexRef = useRef(0);
   const ttsChainRef = useRef<Promise<void>>(Promise.resolve());
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // History state
+  const [historySessions, setHistorySessions] = useState<HistorySession[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [hasMoreHistory, setHasMoreHistory] = useState(true);
+  const oldestLoadedRef = useRef<string | null>(null);
+  const initialHistoryLoaded = useRef(false);
+
+  // Session log tracking
+  const sessionFileRef = useRef<string | null>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -91,6 +109,61 @@ export default function ChatPane() {
       previewUrls.forEach((url) => URL.revokeObjectURL(url));
     };
   }, []);
+
+  // ── History loading ────────────────────────────────────────────────
+
+  const loadMoreHistory = async () => {
+    if (loadingHistory || !hasMoreHistory) return;
+    setLoadingHistory(true);
+
+    const container = scrollContainerRef.current;
+    const prevScrollHeight = container?.scrollHeight ?? 0;
+
+    try {
+      const params = oldestLoadedRef.current
+        ? `?before=${oldestLoadedRef.current}`
+        : "";
+      const res = await fetch(`/api/history${params}`);
+      const data = await res.json();
+
+      if (data.session) {
+        setHistorySessions((prev) => [data.session, ...prev]);
+        oldestLoadedRef.current = data.session.filename;
+        setHasMoreHistory(data.hasMore);
+
+        // Preserve scroll position after prepending
+        requestAnimationFrame(() => {
+          if (container) {
+            const newScrollHeight = container.scrollHeight;
+            container.scrollTop = newScrollHeight - prevScrollHeight;
+          }
+        });
+      } else {
+        setHasMoreHistory(false);
+      }
+    } catch (err) {
+      console.error("[history] Failed to load:", err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  // Load the most recent history session on mount
+  useEffect(() => {
+    if (!initialHistoryLoaded.current) {
+      initialHistoryLoaded.current = true;
+      loadMoreHistory();
+    }
+  }, []);
+
+  // Scroll-to-top detection
+  const handleScroll = () => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    if (container.scrollTop < 80 && !loadingHistory && hasMoreHistory) {
+      loadMoreHistory();
+    }
+  };
 
   // ── File attachment helpers ───────────────────────────────────────
 
@@ -378,6 +451,24 @@ export default function ChatPane() {
     ttsChainRef.current = Promise.resolve();
   };
 
+  // ── Session logging ─────────────────────────────────────────────
+
+  const logToSession = async (role: "user" | "assistant", content: string) => {
+    try {
+      const res = await fetch("/api/session-log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role, content, sessionFile: sessionFileRef.current }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        sessionFileRef.current = data.sessionFile;
+      }
+    } catch (err) {
+      console.error("[session-log] Failed to log:", err);
+    }
+  };
+
   // ── Send message ──────────────────────────────────────────────────
 
   const sendMessage = async (overrideText?: string) => {
@@ -403,6 +494,9 @@ export default function ChatPane() {
         images: previewsToSend.length > 0 ? previewsToSend : undefined,
       },
     ]);
+
+    // Log user message to session file
+    logToSession("user", messageText);
 
     // Add empty assistant message to stream into
     setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
@@ -442,6 +536,7 @@ export default function ChatPane() {
       let buffer = "";
       let currentToolName = "";
       let chunkIndex = 0;
+      let finalAssistantText = "";
 
       while (true) {
         const { done, value } = await reader.read();
@@ -480,6 +575,7 @@ export default function ChatPane() {
                 .map((b: { text: string }) => b.text)
                 .join("");
               if (textBlocks) {
+                finalAssistantText = textBlocks;
                 setMessages((prev) => {
                   const updated = [...prev];
                   const last = updated[updated.length - 1];
@@ -523,6 +619,7 @@ export default function ChatPane() {
               }
               const resultText = (event.result || "").toString();
               if (resultText) {
+                finalAssistantText = resultText;
                 setMessages((prev) => {
                   const updated = [...prev];
                   const last = updated[updated.length - 1];
@@ -547,6 +644,11 @@ export default function ChatPane() {
       }
 
       console.log("[chat-ui] Stream processing complete");
+
+      // Log assistant response to session file
+      if (finalAssistantText) {
+        logToSession("assistant", finalAssistantText);
+      }
     } catch (err) {
       console.error("[chat-ui] Chat error:", err);
       setMessages((prev) => {
@@ -601,8 +703,60 @@ export default function ChatPane() {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 chat-scroll">
-        {messages.length === 0 && (
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto p-4 space-y-4 chat-scroll"
+      >
+        {/* Loading indicator at top */}
+        {loadingHistory && (
+          <div className="flex justify-center py-2">
+            <span className="text-xs text-zinc-500 animate-pulse">Loading history...</span>
+          </div>
+        )}
+
+        {/* Past sessions */}
+        {historySessions.map((session) => (
+          <div key={session.filename}>
+            {/* Session divider */}
+            <div className="flex items-center gap-3 my-4">
+              <div className="flex-1 border-t border-zinc-700" />
+              <span className="text-xs text-zinc-500 whitespace-nowrap">
+                {session.date}
+              </span>
+              <div className="flex-1 border-t border-zinc-700" />
+            </div>
+            {/* Session messages */}
+            {session.messages.map((msg, j) => (
+              <div
+                key={`${session.filename}-${j}`}
+                className={`flex mb-4 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+              >
+                <div
+                  className={`max-w-[85%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap ${
+                    msg.role === "user"
+                      ? "bg-zinc-700 text-zinc-100"
+                      : "bg-zinc-800/50 text-zinc-200"
+                  }`}
+                >
+                  {renderContent(msg.content)}
+                </div>
+              </div>
+            ))}
+          </div>
+        ))}
+
+        {/* Current session divider (only show if we have history loaded) */}
+        {historySessions.length > 0 && messages.length > 0 && (
+          <div className="flex items-center gap-3 my-4">
+            <div className="flex-1 border-t border-zinc-700" />
+            <span className="text-xs text-zinc-500 whitespace-nowrap">Now</span>
+            <div className="flex-1 border-t border-zinc-700" />
+          </div>
+        )}
+
+        {/* Current messages */}
+        {messages.length === 0 && historySessions.length === 0 && (
           <div className="flex items-center justify-center h-full text-zinc-600 text-sm">
             Say hi to Ari!
           </div>
@@ -656,7 +810,7 @@ export default function ChatPane() {
             </div>
           </div>
         )}
-        <div ref={messagesEndRef} />
+        <div ref={messagesEndRef} className="h-12 shrink-0" />
       </div>
 
       {/* Input area */}
