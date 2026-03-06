@@ -9,6 +9,7 @@ Usage:
 """
 
 import json
+import os
 import sys
 import time
 import urllib.request
@@ -21,7 +22,7 @@ ROOT = Path(__file__).parent
 GENERATED = ROOT / "generated"
 GENERATED.mkdir(exist_ok=True)
 
-COMFYUI = "http://localhost:8189"
+COMFYUI = os.environ.get("COMFYUI_URL", "http://localhost:8189")
 
 HAMSTER_ASCII = r"""
    (\(\ /)/)

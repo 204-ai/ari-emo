@@ -1,11 +1,12 @@
 """Queue a ComfyUI workflow to generate Ari's portrait."""
 
 import json
+import os
 import time
 import urllib.request
 import urllib.error
 
-SERVER = "http://localhost:8189"
+SERVER = os.environ.get("COMFYUI_URL", "http://localhost:8189")
 
 PROMPT = (
     "A cute adorable hamster character portrait, studio Ghibli style. "
