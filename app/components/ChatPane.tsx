@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { HamsterState } from "../page";
 import WebcamCapture from "./WebcamCapture";
 
 interface Message {
@@ -53,14 +54,11 @@ async function uploadFiles(
   return results;
 }
 
-import type { HamsterState } from "../page";
-
 interface ChatPaneProps {
-  hamsterState: HamsterState;
   setHamsterState: (state: HamsterState) => void;
 }
 
-export default function ChatPane({ hamsterState, setHamsterState: setHamsterStateProp }: ChatPaneProps) {
+export default function ChatPane({ setHamsterState: setHamsterStateProp }: ChatPaneProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -84,6 +82,7 @@ export default function ChatPane({ hamsterState, setHamsterState: setHamsterStat
   const [ttsEnabled, setTtsEnabled] = useState(true);
   const ttsEnabledRef = useRef(true);
   const ttsAudioRef = useRef<HTMLAudioElement | null>(null);
+  const ttsAudioUrlRef = useRef<string | null>(null);
   const ttsQueueRef = useRef<{ url: string; audio: HTMLAudioElement }[]>([]);
   const ttsPlayingRef = useRef(false);
   const ttsSentIndexRef = useRef(0);
@@ -142,11 +141,12 @@ export default function ChatPane({ hamsterState, setHamsterState: setHamsterStat
     }
   }, [sessionId]);
 
-  // Cleanup preview URLs on unmount
+  // Cleanup TTS and preview URLs on unmount
   useEffect(() => {
     return () => {
-      previewUrls.forEach((url) => URL.revokeObjectURL(url));
+      flushTTS(true);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── History loading ────────────────────────────────────────────────
@@ -356,7 +356,7 @@ export default function ChatPane({ hamsterState, setHamsterState: setHamsterStat
 
   // Keep refs in sync with state so async callbacks see current value
   useEffect(() => { ttsEnabledRef.current = ttsEnabled; }, [ttsEnabled]);
-  useEffect(() => { isStreamingRef.current = isStreaming; }, [isStreaming]);
+  // isStreamingRef is synced manually in sendMessage start/finally for immediate visibility
 
   /** Preload the next audio clip so it starts instantly when needed. */
   const preloadNext = () => {
@@ -388,6 +388,7 @@ export default function ChatPane({ hamsterState, setHamsterState: setHamsterStat
 
     ttsPlayingRef.current = true;
     ttsAudioRef.current = next.audio;
+    ttsAudioUrlRef.current = next.url;
     // Ensure hamster shows talking while audio plays
     setHamsterState("talking");
     // Preload the upcoming clip so there's no gap
@@ -522,7 +523,9 @@ export default function ChatPane({ hamsterState, setHamsterState: setHamsterStat
       ttsAudioRef.current.onended = null;
       ttsAudioRef.current.onerror = null;
       ttsAudioRef.current.pause();
+      if (ttsAudioUrlRef.current) URL.revokeObjectURL(ttsAudioUrlRef.current);
       ttsAudioRef.current = null;
+      ttsAudioUrlRef.current = null;
     }
     for (const item of ttsQueueRef.current) URL.revokeObjectURL(item.url);
     ttsQueueRef.current = [];

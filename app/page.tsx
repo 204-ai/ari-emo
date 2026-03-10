@@ -41,7 +41,7 @@ export default function Home() {
   return (
     <main className="flex h-screen">
       <div style={{ width: `${splitPercent}%` }} className="border-r border-zinc-800">
-        <ChatPane hamsterState={hamsterState} setHamsterState={setHamsterState} />
+        <ChatPane setHamsterState={setHamsterState} />
       </div>
       <div
         onMouseDown={onMouseDown}

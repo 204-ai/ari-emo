@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import type { HamsterState } from "../page";
 
 const EMOTIONS = [
   "happy",
@@ -146,8 +147,6 @@ const EMOTION_MAP: Record<Emotion, EmotionConfig> = {
     ],
   },
 };
-
-type HamsterState = "idle" | "thinking" | "talking";
 
 // Thought bubble content per emotion
 const THOUGHT_CONTENT: Record<Emotion, [string, string]> = {
