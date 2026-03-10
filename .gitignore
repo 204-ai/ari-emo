@@ -28,6 +28,7 @@ Thumbs.db
 # session logs & personal memories
 memories/sessions/
 memories/short/
+memories/USER.md
 
 # user uploads & generated images
 uploads/

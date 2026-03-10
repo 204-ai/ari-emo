@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import ChatPane from "./components/ChatPane";
 import HamsterPane from "./components/HamsterPane";
+import SkillsPane from "./components/SkillsPane";
 
 export type HamsterState = "idle" | "thinking" | "talking";
 
@@ -47,8 +48,13 @@ export default function Home() {
         onMouseDown={onMouseDown}
         className="w-1.5 bg-zinc-800 hover:bg-zinc-600 cursor-col-resize transition-colors flex-shrink-0"
       />
-      <div style={{ width: `${100 - splitPercent}%` }} className="flex items-center justify-center">
-        <HamsterPane hamsterState={hamsterState} setHamsterState={setHamsterState} />
+      <div style={{ width: `${100 - splitPercent}%` }} className="flex flex-col items-center h-full">
+        <div className="flex-1 flex items-center justify-center">
+          <HamsterPane hamsterState={hamsterState} setHamsterState={setHamsterState} />
+        </div>
+        <div className="w-full pb-4">
+          <SkillsPane />
+        </div>
       </div>
     </main>
   );
