@@ -15,6 +15,7 @@ const EMOTIONS = [
   "hungry",
   "mischievous",
   "solshine",
+  "natsukashii",
 ] as const;
 
 type Emotion = (typeof EMOTIONS)[number];
@@ -135,7 +136,97 @@ const EMOTION_MAP: Record<Emotion, EmotionConfig> = {
       { eyes: "-.-", mouth: "u", cheeks: ["  ", "  "] },
     ],
   },
+  natsukashii: {
+    color: "#c4a0e8",
+    speed: 1200,
+    frames: [
+      { eyes: "◕･◕", mouth: "ω", cheeks: ["ﾟ ", " ﾟ"] },
+      { eyes: "ｰ･ｰ", mouth: "ω", cheeks: ["  ", "  "] },
+      { eyes: "◕･◕", mouth: "ω", cheeks: [" ﾟ", "ﾟ "] },
+    ],
+  },
 };
+
+type HamsterState = "idle" | "thinking" | "talking";
+
+// Thought bubble content per emotion
+const THOUGHT_CONTENT: Record<Emotion, [string, string]> = {
+  happy: ["~*~", "*~*"],
+  sad: ["...", "~~~"],
+  angry: ["#!@", "!!!"],
+  surprised: ["?!?", "!!!"],
+  sleepy: ["zzz", "ZzZ"],
+  love: ["<3~", "~<3"],
+  excited: ["!!!", "***"],
+  neutral: ["...", "~~~"],
+  confused: ["???", "?~?"],
+  hungry: ["nom", "~Q~"],
+  mischievous: ["heh", ">:)"],
+  solshine: ["~~~", "..."],
+  natsukashii: ["ﾎｯ", "~ω~"],
+};
+
+// Thinking cloud ASCII art — 4 frames with floating sparkles
+function buildThinkingArt(content: [string, string]): string[][] {
+  return [
+    [
+      `      .  ·  .`,
+      `    (  ${content[0]}  )`,
+      `      '───'`,
+      `        °`,
+      `       ○`,
+    ],
+    [
+      `      ·  .  ·`,
+      `    (  ${content[1]}  )`,
+      `      '───'`,
+      `       ○`,
+      `        °`,
+    ],
+    [
+      `      .  *  .`,
+      `    (  ${content[0]}  )`,
+      `      '───'`,
+      `        °`,
+      `         ○`,
+    ],
+    [
+      `      *  .  *`,
+      `    (  ${content[1]}  )`,
+      `      '───'`,
+      `         ○`,
+      `       °`,
+    ],
+  ];
+}
+
+// Talking sound waves — 4 frames pulsing outward
+const TALKING_ART: string[][] = [
+  [
+    `    ♪          ♫`,
+    `       ·)  )·`,
+    `        ·))·`,
+    `         ·)·`,
+  ],
+  [
+    `    ♫          ♪`,
+    `     ·))    ))·`,
+    `      ·))  ))·`,
+    `        ·))·`,
+  ],
+  [
+    `    ♪    ♫    ♪`,
+    `    ·)))  )))·`,
+    `     ·))  ))·`,
+    `       ·))·`,
+  ],
+  [
+    `    ♫    ♪    ♫`,
+    `   ·)))    )))·`,
+    `    ·)))  )))·`,
+    `      ·))  ))·`,
+  ],
+];
 
 function buildHamster(frame: EmotionFrame): string {
   const { eyes, mouth, cheeks } = frame;
@@ -148,18 +239,26 @@ function buildHamster(frame: EmotionFrame): string {
   ].join("\n");
 }
 
-export default function HamsterPane() {
+interface HamsterPaneProps {
+  hamsterState: HamsterState;
+  setHamsterState: (state: HamsterState) => void;
+}
+
+export default function HamsterPane({ hamsterState, setHamsterState }: HamsterPaneProps) {
   const [emotion, setEmotion] = useState<Emotion>("neutral");
   const [visible, setVisible] = useState(true);
   const [frame, setFrame] = useState(0);
+  const [thoughtFrame, setThoughtFrame] = useState(0);
+  const [talkingFrame, setTalkingFrame] = useState(0);
   const frameRef = useRef(0);
 
-  // Poll for emotion changes
+  // Poll for emotion changes only (state is now passed via props)
   useEffect(() => {
     const poll = setInterval(async () => {
       try {
         const res = await fetch("/api/emotion");
         const data = await res.json();
+
         if (EMOTIONS.includes(data.emotion) && data.emotion !== emotion) {
           setVisible(false);
           setTimeout(() => {
@@ -174,19 +273,40 @@ export default function HamsterPane() {
     return () => clearInterval(poll);
   }, [emotion]);
 
-  // Animate frames
+  // Animate frames (faster when talking)
   useEffect(() => {
     const config = EMOTION_MAP[emotion];
     const numFrames = config.frames.length;
     if (numFrames <= 1) return;
 
+    const speed = hamsterState === "talking" ? config.speed / 2 : config.speed;
     const timer = setInterval(() => {
       frameRef.current = (frameRef.current + 1) % numFrames;
       setFrame(frameRef.current);
-    }, config.speed);
+    }, speed);
 
     return () => clearInterval(timer);
-  }, [emotion]);
+  }, [emotion, hamsterState]);
+
+  // Thought bubble animation (4 frames)
+  useEffect(() => {
+    if (hamsterState !== "thinking") return;
+    setThoughtFrame(0);
+    const timer = setInterval(() => {
+      setThoughtFrame((f) => (f + 1) % 4);
+    }, 800);
+    return () => clearInterval(timer);
+  }, [hamsterState]);
+
+  // Talking sound wave animation (4 frames, faster)
+  useEffect(() => {
+    if (hamsterState !== "talking") return;
+    setTalkingFrame(0);
+    const timer = setInterval(() => {
+      setTalkingFrame((f) => (f + 1) % 4);
+    }, 350);
+    return () => clearInterval(timer);
+  }, [hamsterState]);
 
   const handleClick = async (e: Emotion) => {
     await fetch("/api/emotion", {
@@ -203,12 +323,53 @@ export default function HamsterPane() {
     }, 200);
   };
 
+  const setStateAPI = (state: HamsterState) => {
+    setHamsterState(state);
+    fetch("/api/emotion", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ state }),
+    }).catch(() => {});
+  };
+
   const config = EMOTION_MAP[emotion];
   const currentFrame = config.frames[frame % config.frames.length];
+  const thoughtContent = THOUGHT_CONTENT[emotion];
 
   return (
     <div className="flex flex-col items-center gap-8 p-8">
       <h1 className="text-2xl font-bold text-zinc-300">Ari Emo</h1>
+
+      {/* Animated state indicator */}
+      <div className="h-28 flex items-end justify-center">
+        {hamsterState === "thinking" && (
+          <pre
+            className="text-base leading-snug text-center select-none"
+            style={{
+              color: config.color,
+              fontFamily: "monospace",
+              textShadow: `0 0 8px ${config.color}30, 0 0 16px ${config.color}15`,
+              animation: "thinking-float 3s ease-in-out infinite",
+            }}
+          >
+            {buildThinkingArt(thoughtContent)[thoughtFrame].join("\n")}
+          </pre>
+        )}
+
+        {hamsterState === "talking" && (
+          <pre
+            className="text-base leading-snug text-center select-none"
+            style={{
+              color: config.color,
+              fontFamily: "monospace",
+              textShadow: `0 0 10px ${config.color}40, 0 0 20px ${config.color}20`,
+              animation: "talking-pulse 0.6s ease-in-out infinite",
+            }}
+          >
+            {TALKING_ART[talkingFrame].join("\n")}
+          </pre>
+        )}
+      </div>
 
       <pre
         className="text-3xl leading-relaxed transition-all duration-200 select-none"
@@ -218,6 +379,7 @@ export default function HamsterPane() {
           fontFamily: "monospace",
           textShadow: `0 0 10px ${config.color}40, 0 0 20px ${config.color}20`,
           filter: visible ? "none" : "blur(4px)",
+          animation: hamsterState === "talking" ? "hamster-bob 0.6s ease-in-out infinite" : "none",
         }}
       >
         {buildHamster(currentFrame)}
@@ -228,6 +390,11 @@ export default function HamsterPane() {
         <span className="font-semibold" style={{ color: config.color }}>
           {emotion}
         </span>
+        {hamsterState !== "idle" && (
+          <span className="text-zinc-500 text-sm ml-2">
+            ({hamsterState === "thinking" ? "thinking..." : "talking..."})
+          </span>
+        )}
       </p>
 
       <div className="flex flex-wrap justify-center gap-2 max-w-md">
@@ -250,6 +417,39 @@ export default function HamsterPane() {
           </button>
         ))}
       </div>
+
+      {/* State test buttons */}
+      <div className="flex gap-2 mt-2">
+        {(["idle", "thinking", "talking"] as HamsterState[]).map((s) => (
+          <button
+            key={s}
+            onClick={() => setStateAPI(s)}
+            className={`px-2 py-1 rounded text-xs transition-colors ${
+              hamsterState === s
+                ? "bg-zinc-600 text-zinc-100"
+                : "bg-zinc-800/50 text-zinc-500 hover:text-zinc-300"
+            }`}
+          >
+            {s}
+          </button>
+        ))}
+      </div>
+
+      {/* CSS for animations */}
+      <style jsx>{`
+        @keyframes hamster-bob {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-3px); }
+        }
+        @keyframes thinking-float {
+          0%, 100% { transform: translateY(0); opacity: 0.9; }
+          50% { transform: translateY(-6px); opacity: 1; }
+        }
+        @keyframes talking-pulse {
+          0%, 100% { transform: scale(1); opacity: 0.85; }
+          50% { transform: scale(1.05); opacity: 1; }
+        }
+      `}</style>
     </div>
   );
 }

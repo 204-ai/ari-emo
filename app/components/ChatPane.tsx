@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import WebcamCapture from "./WebcamCapture";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
   toolUse?: string;
-  images?: string[];
 }
 
 interface HistorySession {
@@ -53,11 +53,23 @@ async function uploadFiles(
   return results;
 }
 
-export default function ChatPane() {
+import type { HamsterState } from "../page";
+
+interface ChatPaneProps {
+  hamsterState: HamsterState;
+  setHamsterState: (state: HamsterState) => void;
+}
+
+export default function ChatPane({ hamsterState, setHamsterState: setHamsterStateProp }: ChatPaneProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("ari-session-id");
+    }
+    return null;
+  });
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [isRecording, setIsRecording] = useState(false);
@@ -76,10 +88,20 @@ export default function ChatPane() {
   const ttsPlayingRef = useRef(false);
   const ttsSentIndexRef = useRef(0);
   const ttsChainRef = useRef<Promise<void>>(Promise.resolve());
+  const ttsGenRef = useRef(0); // generation counter to discard stale TTS callbacks
+  const ttsPendingRef = useRef(0); // count of in-flight TTS fetches
+  const isStreamingRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Token counter state
+  const [estimatedTokens, setEstimatedTokens] = useState(0);
+  const [sessionTokens, setSessionTokens] = useState(0);
+
+  // Webcam state
+  const [showWebcam, setShowWebcam] = useState(false);
 
   // History state
   const [historySessions, setHistorySessions] = useState<HistorySession[]>([]);
@@ -90,6 +112,16 @@ export default function ChatPane() {
 
   // Session log tracking
   const sessionFileRef = useRef<string | null>(null);
+
+  // Hamster state helper — updates React state (instant) + API (for persistence)
+  const setHamsterState = (state: HamsterState) => {
+    setHamsterStateProp(state); // instant React update — HamsterPane sees it immediately
+    fetch("/api/emotion", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ state }),
+    }).catch(() => {});
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -102,6 +134,13 @@ export default function ChatPane() {
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  // Persist sessionId to localStorage
+  useEffect(() => {
+    if (sessionId) {
+      localStorage.setItem("ari-session-id", sessionId);
+    }
+  }, [sessionId]);
 
   // Cleanup preview URLs on unmount
   useEffect(() => {
@@ -315,8 +354,15 @@ export default function ChatPane() {
 
   // ── TTS playback (sentence-chunked queue) ────────────────────────
 
-  // Keep ref in sync with state so async callbacks see current value
+  // Keep refs in sync with state so async callbacks see current value
   useEffect(() => { ttsEnabledRef.current = ttsEnabled; }, [ttsEnabled]);
+  useEffect(() => { isStreamingRef.current = isStreaming; }, [isStreaming]);
+
+  /** Preload the next audio clip so it starts instantly when needed. */
+  const preloadNext = () => {
+    const peek = ttsQueueRef.current[0];
+    if (peek) peek.audio.load();
+  };
 
   /** Play the next queued audio clip. Calls itself on `ended`. */
   const playNextTTS = () => {
@@ -325,6 +371,7 @@ export default function ChatPane() {
       for (const item of ttsQueueRef.current) URL.revokeObjectURL(item.url);
       ttsQueueRef.current = [];
       ttsPlayingRef.current = false;
+      setHamsterState("idle");
       return;
     }
 
@@ -332,11 +379,19 @@ export default function ChatPane() {
     if (!next) {
       ttsPlayingRef.current = false;
       ttsAudioRef.current = null;
+      // Only go idle if stream is done AND no TTS fetches are still in-flight
+      if (!isStreamingRef.current && ttsPendingRef.current === 0) {
+        setHamsterState("idle");
+      }
       return;
     }
 
     ttsPlayingRef.current = true;
     ttsAudioRef.current = next.audio;
+    // Ensure hamster shows talking while audio plays
+    setHamsterState("talking");
+    // Preload the upcoming clip so there's no gap
+    preloadNext();
     next.audio.onended = () => {
       URL.revokeObjectURL(next.url);
       playNextTTS();
@@ -390,6 +445,9 @@ export default function ChatPane() {
     const cleaned = sanitizeForSpeech(sentence);
     if (!cleaned) return;
 
+    // Track in-flight request so finally block knows TTS work is pending
+    ttsPendingRef.current++;
+
     // Fire the fetch immediately — don't wait for previous sentences
     const audioPromise = fetch("/api/speak", {
       method: "POST",
@@ -409,35 +467,57 @@ export default function ChatPane() {
       });
 
     // Chain ensures enqueue order matches sentence order
+    const gen = ttsGenRef.current; // capture current generation
     ttsChainRef.current = ttsChainRef.current.then(async () => {
+      ttsPendingRef.current = Math.max(0, ttsPendingRef.current - 1);
+      // Discard if a new response has started (flushTTS bumped the generation)
+      if (gen !== ttsGenRef.current) return;
       const result = await audioPromise;
-      if (!result || !ttsEnabledRef.current) return;
+      if (!result || !ttsEnabledRef.current || gen !== ttsGenRef.current) return;
 
       ttsQueueRef.current.push(result);
       if (!ttsPlayingRef.current) playNextTTS();
     });
   };
 
-  /** Extract completed sentences from new text beyond sentIndex. */
+  /** Extract TTS-ready chunks from new text beyond sentIndex.
+   *  First sentence sends immediately (fast start), then batches ~150+ chars. */
+  const TTS_BATCH_CHUNK = 150;
+  const ttsBufferRef = useRef("");
+  const ttsFirstSentRef = useRef(true); // true until first chunk is emitted
+
   const extractSentences = (fullText: string, sentIndex: number): { sentences: string[]; newIndex: number } => {
     const newText = fullText.slice(sentIndex);
-    const sentences: string[] = [];
-    // Match sentences ending with . ! ? followed by space/newline, or end of a line
+    const rawSentences: { text: string; end: number }[] = [];
     const re = /[^.!?\n]*[.!?](?=\s|$)|[^\n]+\n/g;
     let match: RegExpExecArray | null;
-    let lastEnd = 0;
 
     while ((match = re.exec(newText)) !== null) {
       const sentence = match[0].trim();
-      if (sentence) sentences.push(sentence);
-      lastEnd = match.index + match[0].length;
+      if (sentence) rawSentences.push({ text: sentence, end: match.index + match[0].length });
     }
 
-    return { sentences, newIndex: sentIndex + lastEnd };
+    const chunks: string[] = [];
+    let lastEnd = 0;
+
+    for (const s of rawSentences) {
+      ttsBufferRef.current += (ttsBufferRef.current ? " " : "") + s.text;
+      lastEnd = s.end;
+
+      // First sentence: emit immediately for fast start
+      // After that: batch until we have enough text for smooth playback
+      if (ttsFirstSentRef.current || ttsBufferRef.current.length >= TTS_BATCH_CHUNK) {
+        chunks.push(ttsBufferRef.current);
+        ttsBufferRef.current = "";
+        ttsFirstSentRef.current = false;
+      }
+    }
+
+    return { sentences: chunks, newIndex: sentIndex + lastEnd };
   };
 
   /** Stop all TTS playback and clear the queue. */
-  const flushTTS = () => {
+  const flushTTS = (goIdle = false) => {
     if (ttsAudioRef.current) {
       ttsAudioRef.current.onended = null;
       ttsAudioRef.current.onerror = null;
@@ -448,7 +528,12 @@ export default function ChatPane() {
     ttsQueueRef.current = [];
     ttsPlayingRef.current = false;
     ttsSentIndexRef.current = 0;
+    ttsBufferRef.current = "";
+    ttsFirstSentRef.current = true; // next response starts fresh — first sentence immediate
+    ttsPendingRef.current = 0;
+    ttsGenRef.current++; // invalidate pending TTS fetches from previous response
     ttsChainRef.current = Promise.resolve();
+    if (goIdle) setHamsterState("idle");
   };
 
   // ── Session logging ─────────────────────────────────────────────
@@ -482,24 +567,14 @@ export default function ChatPane() {
     setAttachedFiles([]);
     setPreviewUrls([]);
     setIsStreaming(true);
+    // Sync ref immediately so playNextTTS (from previous response) sees the correct value
+    isStreamingRef.current = true;
 
     const messageText = text || "(shared an image)";
 
-    // Add user message with image previews
-    setMessages((prev) => [
-      ...prev,
-      {
-        role: "user",
-        content: messageText,
-        images: previewsToSend.length > 0 ? previewsToSend : undefined,
-      },
-    ]);
-
-    // Log user message to session file
-    logToSession("user", messageText);
-
-    // Add empty assistant message to stream into
-    setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+    // Set hamster to thinking
+    setHamsterState("thinking");
+    setEstimatedTokens(0);
 
     // Reset TTS sentence tracking for new response
     flushTTS();
@@ -507,10 +582,38 @@ export default function ChatPane() {
     try {
       // Upload files first
       let imagePaths: string[] | undefined;
+      let imageUrls: string[] = [];
       if (filesToSend.length > 0) {
         const uploadResults = await uploadFiles(filesToSend);
         imagePaths = uploadResults.map((r) => r.absolutePath);
+        imageUrls = uploadResults.map(
+          (r) => `/api/image?file=${encodeURIComponent(r.filename)}&source=uploads`
+        );
       }
+
+      // Build content with image markdown so images persist in history
+      let fullContent = messageText;
+      if (imageUrls.length > 0) {
+        const imageMd = imageUrls
+          .map((url, i) => `![Attached ${i + 1}](${url})`)
+          .join("\n");
+        fullContent = messageText + "\n\n" + imageMd;
+      }
+
+      // Add user message with persistent image URLs
+      setMessages((prev) => [
+        ...prev,
+        { role: "user", content: fullContent },
+      ]);
+
+      // Revoke blob preview URLs (no longer needed)
+      previewsToSend.forEach((url) => URL.revokeObjectURL(url));
+
+      // Log user message (with image markdown) to session file
+      logToSession("user", fullContent);
+
+      // Add empty assistant message to stream into
+      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
       const payload = { message: messageText, sessionId, imagePaths };
       console.log("[chat-ui] Sending message:", JSON.stringify(payload));
@@ -537,6 +640,8 @@ export default function ChatPane() {
       let currentToolName = "";
       let chunkIndex = 0;
       let finalAssistantText = "";
+      let firstTextReceived = false;
+      let gotResult = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -575,6 +680,12 @@ export default function ChatPane() {
                 .map((b: { text: string }) => b.text)
                 .join("");
               if (textBlocks) {
+                if (!firstTextReceived) {
+                  firstTextReceived = true;
+                  setHamsterState("talking");
+                }
+                // Estimate tokens (~4 chars per token)
+                setEstimatedTokens(Math.ceil(textBlocks.length / 4));
                 finalAssistantText = textBlocks;
                 setMessages((prev) => {
                   const updated = [...prev];
@@ -619,6 +730,10 @@ export default function ChatPane() {
               }
               const resultText = (event.result || "").toString();
               if (resultText) {
+                if (!firstTextReceived) {
+                  firstTextReceived = true;
+                  setHamsterState("talking");
+                }
                 finalAssistantText = resultText;
                 setMessages((prev) => {
                   const updated = [...prev];
@@ -632,18 +747,77 @@ export default function ChatPane() {
                   }
                   return updated;
                 });
-                // Enqueue any remaining text that wasn't a complete sentence
+                // Flush TTS buffer + any remaining text that wasn't a complete sentence
                 const remaining = resultText.slice(ttsSentIndexRef.current).trim();
-                if (remaining) enqueueTTS(remaining);
+                const finalChunk = (ttsBufferRef.current + (remaining ? " " + remaining : "")).trim();
+                ttsBufferRef.current = "";
+                if (finalChunk) enqueueTTS(finalChunk);
               }
+              gotResult = true;
             }
           } catch (parseErr) {
             console.warn("[chat-ui] Failed to parse NDJSON line:", line, "error:", parseErr);
           }
         }
+
+        // Once we have the result, stop waiting for the stream to close
+        if (gotResult) {
+          console.log("[chat-ui] Got result event — closing reader");
+          reader.cancel();
+          break;
+        }
+      }
+
+      // Flush any remaining content in the buffer (last line without trailing newline)
+      if (buffer.trim()) {
+        console.log("[chat-ui] Flushing remaining buffer:", buffer);
+        try {
+          const event = JSON.parse(buffer);
+          console.log("[chat-ui] Flushed event — type:", event.type);
+
+          if (event.type === "result") {
+            if (event.session_id) {
+              console.log("[chat-ui] Captured session_id from buffer flush:", event.session_id);
+              setSessionId(event.session_id);
+            }
+            const resultText = (event.result || "").toString();
+            if (resultText) {
+              if (!firstTextReceived) {
+                firstTextReceived = true;
+                setHamsterState("talking");
+              }
+              finalAssistantText = resultText;
+              setMessages((prev) => {
+                const updated = [...prev];
+                const last = updated[updated.length - 1];
+                if (last?.role === "assistant") {
+                  updated[updated.length - 1] = {
+                    ...last,
+                    content: resultText,
+                    toolUse: undefined,
+                  };
+                }
+                return updated;
+              });
+              const remaining = resultText.slice(ttsSentIndexRef.current).trim();
+              const finalChunk = (ttsBufferRef.current + (remaining ? " " + remaining : "")).trim();
+              ttsBufferRef.current = "";
+              if (finalChunk) enqueueTTS(finalChunk);
+            }
+          }
+        } catch (parseErr) {
+          console.warn("[chat-ui] Failed to parse remaining buffer:", buffer, "error:", parseErr);
+        }
       }
 
       console.log("[chat-ui] Stream processing complete");
+
+      // Update token count with final text
+      if (finalAssistantText) {
+        const responseTokens = Math.ceil(finalAssistantText.length / 4);
+        setEstimatedTokens(responseTokens);
+        setSessionTokens((prev) => prev + responseTokens);
+      }
 
       // Log assistant response to session file
       if (finalAssistantText) {
@@ -665,13 +839,19 @@ export default function ChatPane() {
     } finally {
       abortRef.current = null;
       setIsStreaming(false);
+      // Sync ref immediately so playNextTTS sees the correct value (useEffect is async)
+      isStreamingRef.current = false;
+      // Only go idle if TTS isn't active or pending — otherwise playNextTTS handles it
+      if (!ttsEnabledRef.current || (!ttsPlayingRef.current && ttsQueueRef.current.length === 0 && ttsPendingRef.current === 0)) {
+        setHamsterState("idle");
+      }
     }
   };
 
   const stopStreaming = () => {
     console.log("[chat-ui] User interrupted streaming");
     abortRef.current?.abort();
-    flushTTS();
+    flushTTS(true);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -688,8 +868,10 @@ export default function ChatPane() {
         <h2 className="text-sm font-semibold text-zinc-400">Chat with Ari</h2>
         <button
           onClick={() => {
-            setTtsEnabled((v) => !v);
-            flushTTS();
+            const newVal = !ttsEnabledRef.current;
+            ttsEnabledRef.current = newVal; // Update ref immediately
+            setTtsEnabled(newVal);
+            if (!newVal) flushTTS(true);
           }}
           className={`px-2 py-1 rounded text-xs transition-colors ${
             ttsEnabled
@@ -770,20 +952,6 @@ export default function ChatPane() {
                   : "bg-zinc-800/50 text-zinc-200"
               }`}
             >
-              {/* User-attached images */}
-              {msg.images && msg.images.length > 0 && (
-                <div className="flex gap-2 flex-wrap mb-2">
-                  {msg.images.map((url, j) => (
-                    <img
-                      key={j}
-                      src={url}
-                      alt={`Attached ${j + 1}`}
-                      className="rounded-lg max-w-full"
-                      style={{ maxHeight: 200 }}
-                    />
-                  ))}
-                </div>
-              )}
               {renderContent(msg.content)}
               {msg.toolUse && (
                 <div className="mt-1 text-xs text-zinc-500 italic">{msg.toolUse}</div>
@@ -812,6 +980,32 @@ export default function ChatPane() {
         )}
         <div ref={messagesEndRef} className="h-12 shrink-0" />
       </div>
+
+      {/* Token counter */}
+      {(isStreaming || estimatedTokens > 0) && (
+        <div className="px-3 py-1 border-t border-zinc-800/50 flex justify-between"
+             style={{ fontFamily: "monospace", fontVariantNumeric: "tabular-nums" }}>
+          <span className="text-[10px] text-zinc-600">
+            {isStreaming ? "~" : ""}{estimatedTokens.toLocaleString()} tokens
+          </span>
+          {sessionTokens > 0 && (
+            <span className="text-[10px] text-zinc-600">
+              session: {sessionTokens.toLocaleString()}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Webcam modal */}
+      {showWebcam && (
+        <WebcamCapture
+          onCapture={(file) => {
+            addFiles([file]);
+            setShowWebcam(false);
+          }}
+          onClose={() => setShowWebcam(false)}
+        />
+      )}
 
       {/* Input area */}
       <div className="p-3 border-t border-zinc-800">
@@ -887,6 +1081,19 @@ export default function ChatPane() {
             </svg>
           </button>
 
+          {/* Camera button */}
+          <button
+            onClick={() => setShowWebcam(true)}
+            className="px-2 py-2 bg-zinc-800 text-zinc-400 rounded-lg text-sm
+                       hover:bg-zinc-700 hover:text-zinc-200 transition-colors"
+            title="Take photo"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+              <circle cx="12" cy="13" r="4" />
+            </svg>
+          </button>
+
           {/* Mic button */}
           <button
             onClick={toggleRecording}
@@ -937,7 +1144,7 @@ export default function ChatPane() {
             </button>
           ) : (
             <button
-              onClick={sendMessage}
+              onClick={() => sendMessage()}
               disabled={!input.trim() && attachedFiles.length === 0}
               className="px-4 py-2 bg-zinc-700 text-zinc-200 rounded-lg text-sm
                          hover:bg-zinc-600 disabled:opacity-40 disabled:cursor-not-allowed
