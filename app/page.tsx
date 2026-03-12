@@ -4,6 +4,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import ChatPane from "./components/ChatPane";
 import HamsterPane from "./components/HamsterPane";
 import SkillsPane from "./components/SkillsPane";
+import TelegramPane from "./components/TelegramPane";
 
 export type HamsterState = "idle" | "thinking" | "talking";
 
@@ -52,7 +53,8 @@ export default function Home() {
         <div className="flex-1 flex items-center justify-center">
           <HamsterPane hamsterState={hamsterState} setHamsterState={setHamsterState} />
         </div>
-        <div className="w-full pb-4">
+        <div className="w-full pb-4 space-y-2">
+          <TelegramPane />
           <SkillsPane />
         </div>
       </div>

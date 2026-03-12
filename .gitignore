@@ -30,6 +30,9 @@ memories/sessions/
 memories/short/
 memories/USER.md
 
+# SQLite memory database
+data/
+
 # user uploads & generated images
 uploads/
 generated/

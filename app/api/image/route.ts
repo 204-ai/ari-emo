@@ -21,14 +21,19 @@ export async function GET(request: Request) {
   try {
     const data = await readFile(filePath);
     const ext = file.split(".").pop()?.toLowerCase();
-    const mime =
-      ext === "png"
-        ? "image/png"
-        : ext === "jpg" || ext === "jpeg"
-          ? "image/jpeg"
-          : ext === "webp"
-            ? "image/webp"
-            : "application/octet-stream";
+    const mimeMap: Record<string, string> = {
+      png: "image/png",
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      webp: "image/webp",
+      gif: "image/gif",
+      mp4: "video/mp4",
+      webm: "video/webm",
+      mov: "video/quicktime",
+      glb: "model/gltf-binary",
+      gltf: "model/gltf+json",
+    };
+    const mime = mimeMap[ext ?? ""] || "application/octet-stream";
 
     return new Response(data, {
       headers: {

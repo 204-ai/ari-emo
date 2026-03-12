@@ -17,7 +17,82 @@ interface HistorySession {
   messages: { role: "user" | "assistant"; content: string; time?: string }[];
 }
 
-/** Parse message content, rendering ![alt](url) as actual images. */
+/** Check if a URL points to a video file. */
+function isVideoUrl(url: string) {
+  return /\.(mp4|webm|mov)(\?|$)/i.test(url);
+}
+
+/** Check if a URL points to a 3D model file. */
+function isModelUrl(url: string) {
+  return /\.(glb|gltf)(\?|$)/i.test(url);
+}
+
+/** Ensure Google model-viewer script is loaded. */
+let modelViewerLoaded = false;
+function ensureModelViewer() {
+  if (modelViewerLoaded) return;
+  modelViewerLoaded = true;
+  const script = document.createElement("script");
+  script.type = "module";
+  script.src =
+    "https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js";
+  document.head.appendChild(script);
+}
+
+/** 3D model viewer component using Google model-viewer. */
+function ModelViewer({ src, alt }: { src: string; alt: string }) {
+  useEffect(() => {
+    ensureModelViewer();
+  }, []);
+
+  return (
+    <div className="rounded-lg my-2 overflow-hidden" style={{ maxWidth: 480 }}>
+      {/* @ts-expect-error model-viewer is a web component */}
+      <model-viewer
+        src={src}
+        alt={alt || "3D model"}
+        auto-rotate
+        camera-controls
+        camera-target="auto auto auto"
+        touch-action="pan-y"
+        shadow-intensity="1"
+        environment-image="neutral"
+        style={{
+          width: "100%",
+          height: "360px",
+          backgroundColor: "#1a1a2e",
+          borderRadius: "8px",
+        }}
+      >
+        <div
+          slot="progress-bar"
+          style={{
+            position: "absolute",
+            bottom: 8,
+            left: 8,
+            color: "#aaa",
+            fontSize: "12px",
+          }}
+        >
+          Loading 3D model...
+        </div>
+      {/* @ts-expect-error model-viewer is a web component */}
+      </model-viewer>
+      <div
+        style={{
+          padding: "6px 10px",
+          fontSize: "11px",
+          color: "#888",
+          background: "#111",
+        }}
+      >
+        Drag to rotate / Scroll to zoom / Shift+drag to pan
+      </div>
+    </div>
+  );
+}
+
+/** Parse message content, rendering ![alt](url) as images, videos, or 3D models. */
 function renderContent(content: string) {
   const parts = content.split(/(!\[[^\]]*\]\([^)]+\))/g);
   if (parts.length === 1) return content;
@@ -25,11 +100,30 @@ function renderContent(content: string) {
   return parts.map((part, i) => {
     const match = part.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
     if (match) {
+      const [, alt, src] = match;
+      if (isModelUrl(src)) {
+        return <ModelViewer key={i} src={src} alt={alt} />;
+      }
+      if (isVideoUrl(src)) {
+        return (
+          <video
+            key={i}
+            src={src}
+            controls
+            loop
+            muted
+            autoPlay
+            playsInline
+            className="rounded-lg my-2 max-w-full"
+            style={{ maxHeight: 400 }}
+          />
+        );
+      }
       return (
         <img
           key={i}
-          src={match[2]}
-          alt={match[1]}
+          src={src}
+          alt={alt}
           className="rounded-lg my-2 max-w-full"
           style={{ maxHeight: 320 }}
         />
@@ -79,6 +173,7 @@ export default function ChatPane({ setHamsterState: setHamsterStateProp }: ChatP
   const liveTranscriptRef = useRef("");
   const speechRecRef = useRef<SpeechRecognition | null>(null);
   const hasSpeechAPIRef = useRef(false);
+  const cancelRecordingRef = useRef(false);
   const [ttsEnabled, setTtsEnabled] = useState(true);
   const ttsEnabledRef = useRef(true);
   const ttsAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -268,16 +363,25 @@ export default function ChatPane({ setHamsterState: setHamsterStateProp }: ChatP
           speechRecRef.current = null;
         }
 
-        const transcript = liveTranscriptRef.current.trim();
-
-        // If Web Speech API gave us text, auto-send it directly
-        if (hasSpeechAPIRef.current && transcript) {
+        // If cancelled, discard everything
+        if (cancelRecordingRef.current) {
+          cancelRecordingRef.current = false;
           updateLiveTranscript("");
-          sendMessage(transcript);
+          chunksRef.current = [];
           return;
         }
 
-        // Fallback: transcribe via Whisper server, then auto-send
+        const transcript = liveTranscriptRef.current.trim();
+
+        // If Web Speech API gave us text, put it in the input box for editing
+        if (hasSpeechAPIRef.current && transcript) {
+          updateLiveTranscript("");
+          setInput((prev) => (prev ? prev + " " + transcript : transcript));
+          setTimeout(() => inputRef.current?.focus(), 50);
+          return;
+        }
+
+        // Fallback: transcribe via Whisper server, then put in input box
         const blob = new Blob(chunksRef.current, { type: "audio/webm" });
         if (blob.size === 0) {
           updateLiveTranscript("");
@@ -292,7 +396,8 @@ export default function ChatPane({ setHamsterState: setHamsterStateProp }: ChatP
           if (!res.ok) throw new Error(`Transcription failed: ${res.status}`);
           const data = await res.json();
           if (data.text) {
-            sendMessage(data.text);
+            setInput((prev) => (prev ? prev + " " + data.text : data.text));
+            setTimeout(() => inputRef.current?.focus(), 50);
           }
         } catch (err) {
           console.error("[voice] Transcription error:", err);
@@ -307,8 +412,7 @@ export default function ChatPane({ setHamsterState: setHamsterStateProp }: ChatP
 
       // Try Web Speech API for real-time preview
       const SpeechRecognitionAPI =
-        (window as unknown as { SpeechRecognition?: typeof SpeechRecognition }).SpeechRecognition ||
-        (window as unknown as { webkitSpeechRecognition?: typeof SpeechRecognition }).webkitSpeechRecognition;
+        window.SpeechRecognition || window.webkitSpeechRecognition;
 
       if (SpeechRecognitionAPI) {
         const recognition = new SpeechRecognitionAPI();
@@ -342,6 +446,13 @@ export default function ChatPane({ setHamsterState: setHamsterStateProp }: ChatP
   };
 
   const stopRecording = () => {
+    mediaRecorderRef.current?.stop();
+    mediaRecorderRef.current = null;
+    setIsRecording(false);
+  };
+
+  const cancelRecording = () => {
+    cancelRecordingRef.current = true;
     mediaRecorderRef.current?.stop();
     mediaRecorderRef.current = null;
     setIsRecording(false);
@@ -542,6 +653,7 @@ export default function ChatPane({ setHamsterState: setHamsterStateProp }: ChatP
   // ── Session logging ─────────────────────────────────────────────
 
   const logToSession = async (role: "user" | "assistant", content: string) => {
+    // Log to markdown session file
     try {
       const res = await fetch("/api/session-log", {
         method: "POST",
@@ -554,6 +666,20 @@ export default function ChatPane({ setHamsterState: setHamsterStateProp }: ChatP
       }
     } catch (err) {
       console.error("[session-log] Failed to log:", err);
+    }
+    // Log to SQLite memory server (fire-and-forget)
+    if (sessionId) {
+      fetch("/api/memory", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "message",
+          session_id: sessionId,
+          role,
+          content,
+          token_estimate: Math.ceil(content.length / 4),
+        }),
+      }).catch(() => {});
     }
   };
 
@@ -1108,7 +1234,7 @@ export default function ChatPane({ setHamsterState: setHamsterStateProp }: ChatP
                 ? "bg-zinc-800 text-amber-400"
                 : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200"
             }`}
-            title={isRecording ? "Stop recording" : isTranscribing ? "Transcribing..." : "Voice input"}
+            title={isRecording ? "Stop & send" : isTranscribing ? "Transcribing..." : "Voice input"}
           >
             {isTranscribing ? (
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin">
@@ -1123,6 +1249,21 @@ export default function ChatPane({ setHamsterState: setHamsterStateProp }: ChatP
               </svg>
             )}
           </button>
+
+          {/* Cancel recording button — only visible while recording */}
+          {isRecording && (
+            <button
+              onClick={cancelRecording}
+              className="px-2 py-2 rounded-lg text-sm bg-zinc-800 text-zinc-400
+                         hover:bg-zinc-700 hover:text-red-400 transition-colors"
+              title="Cancel recording"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          )}
 
           <textarea
             ref={inputRef}
