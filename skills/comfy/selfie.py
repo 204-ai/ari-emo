@@ -18,9 +18,16 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-ROOT = Path(__file__).parent
+ROOT = Path(__file__).resolve().parent.parent.parent
 GENERATED = ROOT / "generated"
 GENERATED.mkdir(exist_ok=True)
+
+# Load .env.local if COMFYUI_URL not already set
+_env_file = ROOT / ".env.local"
+if _env_file.exists() and "COMFYUI_URL" not in os.environ:
+    for _line in _env_file.read_text().splitlines():
+        if _line.startswith("COMFYUI_URL="):
+            os.environ["COMFYUI_URL"] = _line.split("=", 1)[1].strip()
 
 COMFYUI = os.environ.get("COMFYUI_URL", "http://localhost:8189")
 

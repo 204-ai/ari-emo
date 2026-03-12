@@ -30,12 +30,12 @@ curl -s -X POST http://localhost:3000/api/emotion \
 
 Without custom prompt:
 ```bash
-python selfie.py -o "ari_selfie_TIMESTAMP.png"
+python skills/comfy/selfie.py -o "ari_selfie_TIMESTAMP.png"
 ```
 
 With custom prompt (weave $ARGUMENTS_PROMPT into a full image description):
 ```bash
-python selfie.py "A cute adorable hamster, $ARGUMENTS_PROMPT. Round fluffy golden-brown hamster with big sparkly eyes and rosy cheeks. Ultra detailed, cinematic, digital painting, warm lighting." -o "ari_selfie_TIMESTAMP.png"
+python skills/comfy/selfie.py "A cute adorable hamster, $ARGUMENTS_PROMPT. Round fluffy golden-brown hamster with big sparkly eyes and rosy cheeks. Ultra detailed, cinematic, digital painting, warm lighting." -o "ari_selfie_TIMESTAMP.png"
 ```
 
 3. Once complete, output the image in your chat response using markdown image syntax so it renders in the chat UI:

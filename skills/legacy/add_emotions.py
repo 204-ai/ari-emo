@@ -12,7 +12,7 @@ Each emotion needs:
 import re
 from pathlib import Path
 
-ROOT = Path(__file__).parent
+ROOT = Path(__file__).resolve().parent.parent.parent
 
 # ── Define new emotions here ─────────────────────────────────────────
 NEW_EMOTIONS = {

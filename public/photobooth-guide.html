@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>204.ai PHOTÖBOOTH — Assembly Guide</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;700;900&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #f5f0e8;
+    font-family: 'Noto Sans', Arial, sans-serif;
+    color: #333;
+    min-height: 100vh;
+    padding: 40px 20px;
+  }
+
+  .page {
+    max-width: 900px;
+    margin: 0 auto;
+    background: #fff;
+    border: 2px solid #ccc;
+    padding: 50px;
+    position: relative;
+  }
+
+  /* Header */
+  .header {
+    text-align: center;
+    margin-bottom: 40px;
+    border-bottom: 3px solid #0058a3;
+    padding-bottom: 30px;
+  }
+
+  .header h1 {
+    font-size: 42px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    color: #0058a3;
+  }
+
+  .header h1 span {
+    color: #ffda1a;
+  }
+
+  .header .subtitle {
+    font-size: 14px;
+    color: #888;
+    margin-top: 5px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+  }
+
+  .header .model-num {
+    font-size: 12px;
+    color: #aaa;
+    margin-top: 10px;
+    font-family: monospace;
+  }
+
+  /* Warning box */
+  .warning {
+    border: 2px solid #e0a800;
+    background: #fffde6;
+    padding: 15px 20px;
+    margin-bottom: 35px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    border-radius: 4px;
+  }
+
+  .warning svg {
+    flex-shrink: 0;
+  }
+
+  .warning p {
+    font-size: 13px;
+    color: #665500;
+    line-height: 1.5;
+  }
+
+  /* Parts list */
+  .parts-section {
+    margin-bottom: 40px;
+  }
+
+  .parts-section h2 {
+    font-size: 16px;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    color: #0058a3;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 8px;
+  }
+
+  .parts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 20px;
+  }
+
+  .part {
+    text-align: center;
+    padding: 15px;
+    border: 1px dashed #ccc;
+    border-radius: 8px;
+    background: #fafafa;
+  }
+
+  .part svg {
+    margin-bottom: 10px;
+  }
+
+  .part .part-label {
+    font-size: 11px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .part .part-id {
+    font-size: 20px;
+    font-weight: 900;
+    color: #0058a3;
+    margin-top: 2px;
+  }
+
+  .part .part-qty {
+    font-size: 11px;
+    color: #999;
+    margin-top: 2px;
+  }
+
+  /* Steps */
+  .steps-section {
+    margin-top: 40px;
+  }
+
+  .steps-section h2 {
+    font-size: 16px;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    color: #0058a3;
+    margin-bottom: 25px;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 8px;
+  }
+
+  .step {
+    display: flex;
+    gap: 30px;
+    margin-bottom: 45px;
+    align-items: flex-start;
+    padding-bottom: 40px;
+    border-bottom: 1px dotted #ddd;
+  }
+
+  .step:last-child {
+    border-bottom: none;
+  }
+
+  .step-number {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: #0058a3;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-weight: 900;
+    flex-shrink: 0;
+  }
+
+  .step-content {
+    flex: 1;
+  }
+
+  .step-illustration {
+    background: #f9f9f9;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 25px;
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 180px;
+  }
+
+  .step-text {
+    font-size: 13px;
+    color: #666;
+    line-height: 1.6;
+    max-width: 500px;
+  }
+
+  .step-text .click {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid #0058a3;
+    border-radius: 50%;
+    vertical-align: middle;
+    margin: 0 3px;
+    position: relative;
+  }
+
+  /* Result section */
+  .result {
+    text-align: center;
+    margin-top: 40px;
+    padding: 30px;
+    background: linear-gradient(135deg, #f0f7ff, #fff8e0);
+    border-radius: 12px;
+    border: 2px solid #0058a3;
+  }
+
+  .result h2 {
+    font-size: 24px;
+    color: #0058a3;
+    margin-bottom: 8px;
+  }
+
+  .result p {
+    font-size: 14px;
+    color: #666;
+  }
+
+  /* Footer */
+  .footer {
+    text-align: center;
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 2px solid #0058a3;
+    font-size: 11px;
+    color: #aaa;
+  }
+
+  .footer .brand {
+    font-size: 18px;
+    font-weight: 900;
+    color: #0058a3;
+    margin-bottom: 5px;
+  }
+
+  /* Animated dashes for "AI magic" */
+  @keyframes dash {
+    to { stroke-dashoffset: -20; }
+  }
+  .magic-line {
+    stroke-dasharray: 5 5;
+    animation: dash 1s linear infinite;
+  }
+
+  /* Person x2 icon */
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-3px); }
+  }
+  .float { animation: float 2s ease-in-out infinite; }
+
+  /* Click pulse */
+  @keyframes pulse {
+    0%, 100% { r: 6; opacity: 0.3; }
+    50% { r: 10; opacity: 0; }
+  }
+
+  /* Sparkle */
+  @keyframes sparkle {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.3; transform: scale(0.5); }
+  }
+  .sparkle { animation: sparkle 1.5s ease-in-out infinite; }
+  .sparkle:nth-child(2) { animation-delay: 0.3s; }
+  .sparkle:nth-child(3) { animation-delay: 0.6s; }
+
+  @media (max-width: 700px) {
+    .page { padding: 25px; }
+    .step { flex-direction: column; gap: 15px; }
+    .parts-grid { grid-template-columns: repeat(2, 1fr); }
+    .header h1 { font-size: 28px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <!-- Header -->
+  <div class="header">
+    <h1>PHOT<span>Ö</span>BOOTH</h1>
+    <div class="subtitle">AI Magic Mirror Experience</div>
+    <div class="model-num">Art. Nr. 204-AI-2026 &nbsp;|&nbsp; Rev. 3.12</div>
+  </div>
+
+  <!-- Warning -->
+  <div class="warning">
+    <svg width="40" height="40" viewBox="0 0 40 40">
+      <polygon points="20,4 38,36 2,36" fill="none" stroke="#e0a800" stroke-width="2.5"/>
+      <text x="20" y="30" text-anchor="middle" font-size="20" font-weight="bold" fill="#e0a800">!</text>
+    </svg>
+    <p>
+      <strong>IMPORTANT:</strong> Requires 1× imagination, 1× sense of wonder.
+      Not responsible for excessive delight. May cause involuntary smiling.
+      Keep away from people allergic to fun.
+    </p>
+  </div>
+
+  <!-- Parts List -->
+  <div class="parts-section">
+    <h2>Parts / Delar</h2>
+    <div class="parts-grid">
+
+      <!-- Part A: Camera -->
+      <div class="part">
+        <svg width="70" height="70" viewBox="0 0 70 70">
+          <rect x="12" y="22" width="46" height="32" rx="4" fill="none" stroke="#333" stroke-width="2"/>
+          <circle cx="35" cy="38" r="10" fill="none" stroke="#333" stroke-width="2"/>
+          <circle cx="35" cy="38" r="4" fill="#0058a3" opacity="0.3"/>
+          <rect x="26" y="16" width="18" height="8" rx="2" fill="none" stroke="#333" stroke-width="2"/>
+          <circle cx="50" cy="27" r="2" fill="#e0a800"/>
+        </svg>
+        <div class="part-id">A</div>
+        <div class="part-label">Camera</div>
+        <div class="part-qty">× 1</div>
+      </div>
+
+      <!-- Part B: Screen -->
+      <div class="part">
+        <svg width="70" height="70" viewBox="0 0 70 70">
+          <rect x="10" y="12" width="50" height="35" rx="3" fill="none" stroke="#333" stroke-width="2"/>
+          <rect x="14" y="16" width="42" height="27" rx="1" fill="#0058a3" opacity="0.1"/>
+          <rect x="28" y="48" width="14" height="4" fill="none" stroke="#333" stroke-width="2"/>
+          <rect x="22" y="52" width="26" height="3" rx="1" fill="none" stroke="#333" stroke-width="2"/>
+        </svg>
+        <div class="part-id">B</div>
+        <div class="part-label">Display</div>
+        <div class="part-qty">× 1</div>
+      </div>
+
+      <!-- Part C: Computer -->
+      <div class="part">
+        <svg width="70" height="70" viewBox="0 0 70 70">
+          <rect x="15" y="12" width="40" height="46" rx="3" fill="none" stroke="#333" stroke-width="2"/>
+          <line x1="15" y1="20" x2="55" y2="20" stroke="#333" stroke-width="1"/>
+          <circle cx="35" cy="16" r="2" fill="#0058a3"/>
+          <rect x="20" y="26" width="12" height="2" rx="1" fill="#ccc"/>
+          <rect x="20" y="32" width="18" height="2" rx="1" fill="#ccc"/>
+          <rect x="20" y="38" width="8" height="2" rx="1" fill="#ccc"/>
+          <rect x="20" y="44" width="14" height="2" rx="1" fill="#e0a800"/>
+        </svg>
+        <div class="part-id">C</div>
+        <div class="part-label">GPU Server</div>
+        <div class="part-qty">× 1</div>
+      </div>
+
+      <!-- Part D: AI Brain -->
+      <div class="part">
+        <svg width="70" height="70" viewBox="0 0 70 70">
+          <ellipse cx="35" cy="35" rx="20" ry="18" fill="none" stroke="#333" stroke-width="2"/>
+          <path d="M22 30 Q28 25 35 30 Q42 25 48 30" fill="none" stroke="#333" stroke-width="1.5"/>
+          <path d="M22 38 Q28 33 35 38 Q42 33 48 38" fill="none" stroke="#333" stroke-width="1.5"/>
+          <line x1="35" y1="20" x2="35" y2="50" stroke="#333" stroke-width="1" stroke-dasharray="2 2"/>
+          <!-- sparkles -->
+          <circle cx="18" cy="20" r="2" fill="#e0a800" class="sparkle"/>
+          <circle cx="52" cy="22" r="2" fill="#e0a800" class="sparkle"/>
+          <circle cx="14" cy="45" r="2" fill="#e0a800" class="sparkle"/>
+        </svg>
+        <div class="part-id">D</div>
+        <div class="part-label">AI Brain</div>
+        <div class="part-qty">× 1</div>
+      </div>
+
+      <!-- Part E: Human -->
+      <div class="part">
+        <svg width="70" height="70" viewBox="0 0 70 70">
+          <circle cx="35" cy="22" r="10" fill="none" stroke="#333" stroke-width="2"/>
+          <circle cx="31" cy="20" r="1.5" fill="#333"/>
+          <circle cx="39" cy="20" r="1.5" fill="#333"/>
+          <path d="M31 26 Q35 30 39 26" fill="none" stroke="#333" stroke-width="1.5"/>
+          <path d="M25 38 Q35 32 45 38 L48 58 L22 58 Z" fill="none" stroke="#333" stroke-width="2"/>
+        </svg>
+        <div class="part-id">E</div>
+        <div class="part-label">Human</div>
+        <div class="part-qty">× 1+</div>
+      </div>
+
+      <!-- Part F: Printer -->
+      <div class="part">
+        <svg width="70" height="70" viewBox="0 0 70 70">
+          <!-- Printer body -->
+          <rect x="10" y="24" width="50" height="26" rx="3" fill="none" stroke="#333" stroke-width="2"/>
+          <!-- Paper tray top -->
+          <rect x="18" y="14" width="34" height="12" rx="2" fill="none" stroke="#333" stroke-width="1.5"/>
+          <!-- Paper coming out -->
+          <rect x="20" y="48" width="30" height="16" rx="1" fill="#fff" stroke="#333" stroke-width="1.5"/>
+          <!-- Image on paper -->
+          <circle cx="35" cy="55" r="4" fill="none" stroke="#0058a3" stroke-width="1"/>
+          <circle cx="33" cy="54" r="0.8" fill="#0058a3"/>
+          <circle cx="37" cy="54" r="0.8" fill="#0058a3"/>
+          <path d="M33 57 Q35 59 37 57" fill="none" stroke="#0058a3" stroke-width="0.8"/>
+          <!-- Status light -->
+          <circle cx="50" cy="30" r="2" fill="#4caf50"/>
+          <!-- Feed slot -->
+          <line x1="15" y1="44" x2="55" y2="44" stroke="#333" stroke-width="1"/>
+        </svg>
+        <div class="part-id">F</div>
+        <div class="part-label">Printer</div>
+        <div class="part-qty">× 1</div>
+      </div>
+
+      <!-- Part G: Online Gallery -->
+      <div class="part">
+        <svg width="70" height="70" viewBox="0 0 70 70">
+          <!-- Browser window -->
+          <rect x="8" y="14" width="54" height="42" rx="3" fill="none" stroke="#333" stroke-width="2"/>
+          <!-- URL bar -->
+          <rect x="8" y="14" width="54" height="10" rx="3" fill="#f0f0f0" stroke="#333" stroke-width="1.5"/>
+          <circle cx="14" cy="19" r="2" fill="#e74c3c"/>
+          <circle cx="20" cy="19" r="2" fill="#e0a800"/>
+          <circle cx="26" cy="19" r="2" fill="#4caf50"/>
+          <rect x="32" y="17" width="24" height="4" rx="1" fill="#ddd"/>
+          <!-- Gallery grid -->
+          <rect x="12" y="28" width="14" height="11" rx="1" fill="#0058a3" opacity="0.15" stroke="#0058a3" stroke-width="0.5"/>
+          <rect x="28" y="28" width="14" height="11" rx="1" fill="#0058a3" opacity="0.25" stroke="#0058a3" stroke-width="0.5"/>
+          <rect x="44" y="28" width="14" height="11" rx="1" fill="#0058a3" opacity="0.15" stroke="#0058a3" stroke-width="0.5"/>
+          <rect x="12" y="41" width="14" height="11" rx="1" fill="#0058a3" opacity="0.25" stroke="#0058a3" stroke-width="0.5"/>
+          <rect x="28" y="41" width="14" height="11" rx="1" fill="#0058a3" opacity="0.15" stroke="#0058a3" stroke-width="0.5"/>
+          <rect x="44" y="41" width="14" height="11" rx="1" fill="#0058a3" opacity="0.25" stroke="#0058a3" stroke-width="0.5"/>
+          <!-- QR hint -->
+          <rect x="22" y="58" width="8" height="8" rx="1" fill="none" stroke="#333" stroke-width="1"/>
+          <rect x="24" y="60" width="2" height="2" fill="#333"/>
+          <rect x="27" y="60" width="2" height="2" fill="#333"/>
+          <rect x="24" y="63" width="2" height="2" fill="#333"/>
+          <rect x="40" y="58" width="8" height="8" rx="1" fill="none" stroke="#333" stroke-width="1"/>
+        </svg>
+        <div class="part-id">G</div>
+        <div class="part-label">Online Gallery</div>
+        <div class="part-qty">× 1 per kiosk</div>
+      </div>
+
+      <!-- Part H: Joy -->
+      <div class="part">
+        <svg width="70" height="70" viewBox="0 0 70 70">
+          <text x="35" y="42" text-anchor="middle" font-size="36">✨</text>
+        </svg>
+        <div class="part-id">H</div>
+        <div class="part-label">Joy</div>
+        <div class="part-qty">× ∞</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Assembly Steps -->
+  <div class="steps-section">
+    <h2>Assembly / Montering</h2>
+
+    <!-- Step 1: Approach -->
+    <div class="step">
+      <div class="step-number">1</div>
+      <div class="step-content">
+        <div class="step-illustration">
+          <svg width="400" height="160" viewBox="0 0 400 160">
+            <!-- Floor line -->
+            <line x1="0" y1="140" x2="400" y2="140" stroke="#ddd" stroke-width="1"/>
+
+            <!-- Person walking -->
+            <g transform="translate(80, 40)" class="float">
+              <!-- head -->
+              <circle cx="0" cy="0" r="14" fill="none" stroke="#333" stroke-width="2"/>
+              <circle cx="-4" cy="-2" r="2" fill="#333"/>
+              <circle cx="4" cy="-2" r="2" fill="#333"/>
+              <path d="M-4 5 Q0 9 4 5" fill="none" stroke="#333" stroke-width="1.5"/>
+              <!-- body -->
+              <line x1="0" y1="14" x2="0" y2="55" stroke="#333" stroke-width="2"/>
+              <!-- arms -->
+              <line x1="0" y1="28" x2="-18" y2="45" stroke="#333" stroke-width="2"/>
+              <line x1="0" y1="28" x2="18" y2="42" stroke="#333" stroke-width="2"/>
+              <!-- legs walking -->
+              <line x1="0" y1="55" x2="-12" y2="85" stroke="#333" stroke-width="2"/>
+              <line x1="0" y1="55" x2="12" y2="85" stroke="#333" stroke-width="2"/>
+            </g>
+
+            <!-- Arrow -->
+            <line x1="120" y1="80" x2="200" y2="80" stroke="#0058a3" stroke-width="2" stroke-dasharray="6 4"/>
+            <polygon points="200,74 215,80 200,86" fill="#0058a3"/>
+
+            <!-- Booth/Screen -->
+            <g transform="translate(260, 15)">
+              <rect x="0" y="0" width="90" height="65" rx="4" fill="none" stroke="#333" stroke-width="2.5"/>
+              <rect x="5" y="5" width="80" height="50" rx="2" fill="#e8f0fe"/>
+              <!-- Camera on top -->
+              <circle cx="45" cy="-8" r="6" fill="none" stroke="#333" stroke-width="2"/>
+              <circle cx="45" cy="-8" r="2.5" fill="#0058a3" opacity="0.4"/>
+              <!-- Stand -->
+              <rect x="38" y="65" width="14" height="40" fill="none" stroke="#333" stroke-width="2"/>
+              <rect x="28" y="105" width="34" height="5" rx="2" fill="none" stroke="#333" stroke-width="2"/>
+              <!-- Text on screen -->
+              <text x="45" y="30" text-anchor="middle" font-size="9" fill="#0058a3" font-weight="bold">204.ai</text>
+              <text x="45" y="44" text-anchor="middle" font-size="7" fill="#888">STEP UP</text>
+            </g>
+          </svg>
+        </div>
+        <div class="step-text">
+          Approach booth. Stand approximately 1 meter away. Smile optional but recommended.
+          Booth detects <strong>E</strong> automatically.
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2: Capture -->
+    <div class="step">
+      <div class="step-number">2</div>
+      <div class="step-content">
+        <div class="step-illustration">
+          <svg width="400" height="160" viewBox="0 0 400 160">
+            <!-- Person standing still -->
+            <g transform="translate(130, 30)">
+              <circle cx="0" cy="0" r="14" fill="none" stroke="#333" stroke-width="2"/>
+              <circle cx="-4" cy="-2" r="2" fill="#333"/>
+              <circle cx="4" cy="-2" r="2" fill="#333"/>
+              <path d="M-5 5 Q0 10 5 5" fill="none" stroke="#333" stroke-width="1.5"/>
+              <line x1="0" y1="14" x2="0" y2="55" stroke="#333" stroke-width="2"/>
+              <line x1="0" y1="28" x2="-15" y2="48" stroke="#333" stroke-width="2"/>
+              <line x1="0" y1="28" x2="15" y2="48" stroke="#333" stroke-width="2"/>
+              <line x1="0" y1="55" x2="-10" y2="90" stroke="#333" stroke-width="2"/>
+              <line x1="0" y1="55" x2="10" y2="90" stroke="#333" stroke-width="2"/>
+            </g>
+
+            <!-- Camera rays -->
+            <line x1="175" y1="40" x2="240" y2="25" stroke="#e0a800" stroke-width="1.5" class="magic-line"/>
+            <line x1="175" y1="55" x2="240" y2="55" stroke="#e0a800" stroke-width="1.5" class="magic-line"/>
+            <line x1="175" y1="70" x2="240" y2="85" stroke="#e0a800" stroke-width="1.5" class="magic-line"/>
+
+            <!-- Camera -->
+            <g transform="translate(240, 30)">
+              <rect x="0" y="0" width="55" height="50" rx="4" fill="none" stroke="#333" stroke-width="2.5"/>
+              <circle cx="27" cy="25" r="14" fill="none" stroke="#333" stroke-width="2"/>
+              <circle cx="27" cy="25" r="6" fill="#0058a3" opacity="0.3"/>
+              <!-- Flash -->
+              <circle cx="27" cy="25" r="20" fill="#e0a800" opacity="0.1">
+                <animate attributeName="opacity" values="0.1;0.3;0.1" dur="1s" repeatCount="indefinite"/>
+              </circle>
+              <!-- CLICK text -->
+              <text x="27" y="-8" text-anchor="middle" font-size="11" font-weight="bold" fill="#e0a800">CLICK!</text>
+            </g>
+
+            <!-- Floor -->
+            <line x1="0" y1="140" x2="400" y2="140" stroke="#ddd" stroke-width="1"/>
+          </svg>
+        </div>
+        <div class="step-text">
+          Camera <strong>A</strong> captures your photo. Hold still for 1 second.
+          Do your best pose — this is your input to the magic.
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3: AI Processing -->
+    <div class="step">
+      <div class="step-number">3</div>
+      <div class="step-content">
+        <div class="step-illustration">
+          <svg width="400" height="160" viewBox="0 0 400 160">
+            <!-- Input photo -->
+            <g transform="translate(30, 25)">
+              <rect x="0" y="0" width="70" height="90" rx="3" fill="#f0f0f0" stroke="#333" stroke-width="1.5"/>
+              <!-- Simple face in photo -->
+              <circle cx="35" cy="30" r="12" fill="none" stroke="#999" stroke-width="1.5"/>
+              <circle cx="31" cy="28" r="1.5" fill="#999"/>
+              <circle cx="39" cy="28" r="1.5" fill="#999"/>
+              <path d="M31 35 Q35 38 39 35" fill="none" stroke="#999" stroke-width="1"/>
+              <rect x="15" y="55" width="40" height="3" rx="1" fill="#ddd"/>
+              <rect x="20" y="62" width="30" height="3" rx="1" fill="#ddd"/>
+              <text x="35" y="85" text-anchor="middle" font-size="7" fill="#aaa">INPUT</text>
+            </g>
+
+            <!-- Arrow to brain -->
+            <line x1="110" y1="70" x2="145" y2="70" stroke="#0058a3" stroke-width="2"/>
+            <polygon points="145,64 158,70 145,76" fill="#0058a3"/>
+
+            <!-- AI Brain processing -->
+            <g transform="translate(200, 45)">
+              <ellipse cx="0" cy="0" rx="35" ry="30" fill="none" stroke="#333" stroke-width="2"/>
+              <path d="M-18 -5 Q-8 -12 0 -5 Q8 -12 18 -5" fill="none" stroke="#0058a3" stroke-width="1.5"/>
+              <path d="M-18 5 Q-8 -2 0 5 Q8 -2 18 5" fill="none" stroke="#0058a3" stroke-width="1.5"/>
+              <line x1="0" y1="-25" x2="0" y2="25" stroke="#0058a3" stroke-width="1" stroke-dasharray="3 3"/>
+
+              <!-- Sparkles around brain -->
+              <g class="sparkle"><polygon points="-38,-20 -35,-15 -32,-20 -35,-25" fill="#e0a800"/></g>
+              <g class="sparkle"><polygon points="38,-18 41,-13 44,-18 41,-23" fill="#e0a800"/></g>
+              <g class="sparkle"><polygon points="0,38 3,43 6,38 3,33" fill="#e0a800"/></g>
+
+              <!-- Gear/processing -->
+              <text x="0" y="5" text-anchor="middle" font-size="9" fill="#0058a3" font-weight="bold">AI</text>
+
+              <!-- Loading dots -->
+              <circle cx="-8" cy="20" r="2" fill="#0058a3" opacity="0.3">
+                <animate attributeName="opacity" values="0.3;1;0.3" dur="1.2s" repeatCount="indefinite"/>
+              </circle>
+              <circle cx="0" cy="20" r="2" fill="#0058a3" opacity="0.3">
+                <animate attributeName="opacity" values="0.3;1;0.3" dur="1.2s" begin="0.3s" repeatCount="indefinite"/>
+              </circle>
+              <circle cx="8" cy="20" r="2" fill="#0058a3" opacity="0.3">
+                <animate attributeName="opacity" values="0.3;1;0.3" dur="1.2s" begin="0.6s" repeatCount="indefinite"/>
+              </circle>
+            </g>
+
+            <!-- Arrow to output -->
+            <line x1="245" y1="70" x2="280" y2="70" stroke="#0058a3" stroke-width="2"/>
+            <polygon points="280,64 293,70 280,76" fill="#0058a3"/>
+
+            <!-- Output photo (transformed) -->
+            <g transform="translate(300, 25)">
+              <rect x="0" y="0" width="70" height="90" rx="3" fill="#f0f7ff" stroke="#0058a3" stroke-width="1.5"/>
+              <!-- Transformed face - knight/hero -->
+              <circle cx="35" cy="28" r="12" fill="none" stroke="#0058a3" stroke-width="1.5"/>
+              <!-- Crown/helmet -->
+              <path d="M23 20 L28 12 L32 18 L35 10 L38 18 L42 12 L47 20" fill="none" stroke="#e0a800" stroke-width="1.5"/>
+              <circle cx="31" cy="26" r="1.5" fill="#0058a3"/>
+              <circle cx="39" cy="26" r="1.5" fill="#0058a3"/>
+              <path d="M31 33 Q35 37 39 33" fill="none" stroke="#0058a3" stroke-width="1.5"/>
+              <!-- Sparkle on photo -->
+              <polygon points="58,8 60,14 66,14 61,18 63,24 58,20 53,24 55,18 50,14 56,14" fill="#e0a800" opacity="0.6"/>
+              <rect x="10" y="55" width="50" height="3" rx="1" fill="#0058a3" opacity="0.2"/>
+              <rect x="15" y="62" width="40" height="3" rx="1" fill="#0058a3" opacity="0.2"/>
+              <text x="35" y="85" text-anchor="middle" font-size="7" fill="#0058a3">OUTPUT</text>
+            </g>
+          </svg>
+        </div>
+        <div class="step-text">
+          <strong>D</strong> (AI Brain) processes your photo through <strong>C</strong> (GPU Server).
+          Takes ~10 seconds. Your face is transformed into something extraordinary.
+          Style options: knight, astronaut, anime, oil painting, and more.
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 4: Display Result -->
+    <div class="step">
+      <div class="step-number">4</div>
+      <div class="step-content">
+        <div class="step-illustration">
+          <svg width="400" height="160" viewBox="0 0 400 160">
+            <!-- Big screen with result -->
+            <g transform="translate(120, 10)">
+              <rect x="0" y="0" width="160" height="105" rx="5" fill="none" stroke="#333" stroke-width="2.5"/>
+              <rect x="5" y="5" width="150" height="90" rx="3" fill="linear-gradient(135deg, #e8f0fe, #fff8e0)"/>
+              <!-- Gradient fill workaround -->
+              <defs>
+                <linearGradient id="screenGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" style="stop-color:#e8f0fe"/>
+                  <stop offset="100%" style="stop-color:#fff8e0"/>
+                </linearGradient>
+              </defs>
+              <rect x="5" y="5" width="150" height="90" rx="3" fill="url(#screenGrad)"/>
+
+              <!-- Transformed portrait on screen -->
+              <circle cx="80" cy="40" r="18" fill="none" stroke="#0058a3" stroke-width="2"/>
+              <path d="M62 30 L68 20 L73 28 L80 16 L87 28 L92 20 L98 30" fill="none" stroke="#e0a800" stroke-width="2"/>
+              <circle cx="75" cy="38" r="2" fill="#0058a3"/>
+              <circle cx="85" cy="38" r="2" fill="#0058a3"/>
+              <path d="M75 47 Q80 52 85 47" fill="none" stroke="#0058a3" stroke-width="2"/>
+
+              <!-- Sparkles on screen -->
+              <polygon points="130,20 132,25 137,25 133,28 135,33 130,30 125,33 127,28 123,25 128,25" fill="#e0a800" opacity="0.7"/>
+              <polygon points="25,65 27,69 31,69 28,72 29,76 25,73 21,76 22,72 19,69 23,69" fill="#e0a800" opacity="0.5"/>
+
+              <text x="80" y="80" text-anchor="middle" font-size="8" fill="#0058a3" font-weight="bold">✨ YOUR PORTRAIT ✨</text>
+
+              <!-- Stand -->
+              <rect x="68" y="105" width="24" height="25" fill="none" stroke="#333" stroke-width="2"/>
+              <rect x="55" y="130" width="50" height="5" rx="2" fill="none" stroke="#333" stroke-width="2"/>
+            </g>
+
+            <!-- Happy person looking at screen -->
+            <g transform="translate(60, 40)">
+              <circle cx="0" cy="0" r="12" fill="none" stroke="#333" stroke-width="2"/>
+              <circle cx="-4" cy="-2" r="1.5" fill="#333"/>
+              <circle cx="4" cy="-2" r="1.5" fill="#333"/>
+              <!-- Big smile -->
+              <path d="M-6 4 Q0 12 6 4" fill="none" stroke="#333" stroke-width="1.5"/>
+              <line x1="0" y1="12" x2="0" y2="45" stroke="#333" stroke-width="2"/>
+              <!-- Arms up in excitement -->
+              <line x1="0" y1="22" x2="-18" y2="10" stroke="#333" stroke-width="2"/>
+              <line x1="0" y1="22" x2="18" y2="12" stroke="#333" stroke-width="2"/>
+              <line x1="0" y1="45" x2="-10" y2="72" stroke="#333" stroke-width="2"/>
+              <line x1="0" y1="45" x2="10" y2="72" stroke="#333" stroke-width="2"/>
+            </g>
+
+            <!-- Exclamation marks -->
+            <text x="45" y="25" font-size="16" fill="#e0a800" font-weight="bold" class="float">!</text>
+            <text x="70" y="18" font-size="12" fill="#e0a800" font-weight="bold" class="float">!</text>
+
+            <!-- Second person on other side -->
+            <g transform="translate(340, 45)">
+              <circle cx="0" cy="0" r="11" fill="none" stroke="#333" stroke-width="2"/>
+              <circle cx="-3" cy="-2" r="1.5" fill="#333"/>
+              <circle cx="3" cy="-2" r="1.5" fill="#333"/>
+              <path d="M-4 4 Q0 9 4 4" fill="none" stroke="#333" stroke-width="1.5"/>
+              <line x1="0" y1="11" x2="0" y2="40" stroke="#333" stroke-width="2"/>
+              <line x1="0" y1="22" x2="-14" y2="35" stroke="#333" stroke-width="2"/>
+              <line x1="0" y1="22" x2="14" y2="35" stroke="#333" stroke-width="2"/>
+              <line x1="0" y1="40" x2="-8" y2="65" stroke="#333" stroke-width="2"/>
+              <line x1="0" y1="40" x2="8" y2="65" stroke="#333" stroke-width="2"/>
+              <!-- Phone taking photo -->
+              <rect x="14" y="28" width="10" height="16" rx="2" fill="none" stroke="#333" stroke-width="1.5"/>
+            </g>
+
+            <!-- Floor -->
+            <line x1="0" y1="148" x2="400" y2="148" stroke="#ddd" stroke-width="1"/>
+          </svg>
+        </div>
+        <div class="step-text">
+          Marvel at your AI portrait on display <strong>B</strong>.
+          Share with friends. Take a photo of the screen. Post everywhere.
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 5: Print -->
+    <div class="step">
+      <div class="step-number">5</div>
+      <div class="step-content">
+        <div class="step-illustration">
+          <svg width="400" height="180" viewBox="0 0 400 180">
+            <!-- Screen on left -->
+            <g transform="translate(30, 20)">
+              <rect x="0" y="0" width="80" height="55" rx="3" fill="none" stroke="#333" stroke-width="2"/>
+              <rect x="4" y="4" width="72" height="44" rx="2" fill="url(#screenGrad2)"/>
+              <defs>
+                <linearGradient id="screenGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" style="stop-color:#e8f0fe"/>
+                  <stop offset="100%" style="stop-color:#fff8e0"/>
+                </linearGradient>
+              </defs>
+              <!-- Face on screen -->
+              <circle cx="40" cy="22" r="10" fill="none" stroke="#0058a3" stroke-width="1.5"/>
+              <path d="M30 16 L33 10 L37 14 L40 7 L43 14 L47 10 L50 16" fill="none" stroke="#e0a800" stroke-width="1.2"/>
+              <circle cx="37" cy="20" r="1.5" fill="#0058a3"/>
+              <circle cx="43" cy="20" r="1.5" fill="#0058a3"/>
+              <path d="M37 27 Q40 30 43 27" fill="none" stroke="#0058a3" stroke-width="1"/>
+              <text x="40" y="44" text-anchor="middle" font-size="5" fill="#0058a3">PRINT?</text>
+            </g>
+
+            <!-- Arrow to printer -->
+            <line x1="120" y1="50" x2="155" y2="50" stroke="#0058a3" stroke-width="2" stroke-dasharray="5 3"/>
+            <polygon points="155,44 168,50 155,56" fill="#0058a3"/>
+
+            <!-- Printer -->
+            <g transform="translate(175, 15)">
+              <!-- Printer body -->
+              <rect x="0" y="18" width="80" height="40" rx="4" fill="none" stroke="#333" stroke-width="2.5"/>
+              <!-- Paper tray top -->
+              <rect x="12" y="6" width="56" height="14" rx="3" fill="none" stroke="#333" stroke-width="1.5"/>
+              <!-- Feed slot -->
+              <line x1="5" y1="50" x2="75" y2="50" stroke="#333" stroke-width="1.5"/>
+              <!-- Status light -->
+              <circle cx="66" cy="30" r="3" fill="#4caf50">
+                <animate attributeName="opacity" values="1;0.4;1" dur="1.5s" repeatCount="indefinite"/>
+              </circle>
+              <!-- Whirr lines -->
+              <text x="40" y="40" text-anchor="middle" font-size="8" fill="#888">WHIRRRR</text>
+
+              <!-- Paper coming out with portrait -->
+              <g>
+                <rect x="15" y="55" width="50" height="65" rx="2" fill="#fff" stroke="#333" stroke-width="1.5"/>
+                <!-- Printed portrait -->
+                <circle cx="40" cy="75" r="12" fill="none" stroke="#0058a3" stroke-width="1.5"/>
+                <path d="M28 68 L32 60 L36 66 L40 56 L44 66 L48 60 L52 68" fill="none" stroke="#e0a800" stroke-width="1.5"/>
+                <circle cx="37" cy="73" r="2" fill="#0058a3"/>
+                <circle cx="43" cy="73" r="2" fill="#0058a3"/>
+                <path d="M36 80 Q40 84 44 80" fill="none" stroke="#0058a3" stroke-width="1.5"/>
+                <!-- 204.ai watermark -->
+                <text x="40" y="110" text-anchor="middle" font-size="6" fill="#ccc">204.ai</text>
+                <!-- Sparkle on print -->
+                <polygon points="55,60 57,64 61,64 58,67 59,71 55,68 51,71 52,67 49,64 53,64" fill="#e0a800" opacity="0.6"/>
+              </g>
+            </g>
+
+            <!-- Happy person grabbing print -->
+            <g transform="translate(310, 40)">
+              <circle cx="0" cy="0" r="12" fill="none" stroke="#333" stroke-width="2"/>
+              <circle cx="-4" cy="-2" r="1.5" fill="#333"/>
+              <circle cx="4" cy="-2" r="1.5" fill="#333"/>
+              <!-- Excited open mouth -->
+              <ellipse cx="0" cy="6" rx="4" ry="3" fill="none" stroke="#333" stroke-width="1.5"/>
+              <line x1="0" y1="12" x2="0" y2="45" stroke="#333" stroke-width="2"/>
+              <!-- Arms reaching for print -->
+              <line x1="0" y1="22" x2="-25" y2="30" stroke="#333" stroke-width="2"/>
+              <line x1="0" y1="22" x2="-20" y2="15" stroke="#333" stroke-width="2"/>
+              <line x1="0" y1="45" x2="-10" y2="72" stroke="#333" stroke-width="2"/>
+              <line x1="0" y1="45" x2="10" y2="72" stroke="#333" stroke-width="2"/>
+              <!-- Heart -->
+              <g transform="translate(15, -15)" class="float">
+                <path d="M0 4 C0 0 -5 -2 -5 2 C-5 6 0 8 0 8 C0 8 5 6 5 2 C5 -2 0 0 0 4Z" fill="#e74c3c" opacity="0.6"/>
+              </g>
+            </g>
+
+            <!-- Floor -->
+            <line x1="0" y1="165" x2="400" y2="165" stroke="#ddd" stroke-width="1"/>
+          </svg>
+        </div>
+        <div class="step-text">
+          Printer <strong>F</strong> produces a high-quality print of your AI portrait.
+          Take it home. Stick it on the fridge. Frame it.
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 6: Online Gallery -->
+    <div class="step">
+      <div class="step-number">6</div>
+      <div class="step-content">
+        <div class="step-illustration">
+          <svg width="400" height="170" viewBox="0 0 400 170">
+            <!-- Phone with QR code -->
+            <g transform="translate(40, 20)">
+              <!-- Phone body -->
+              <rect x="0" y="0" width="55" height="100" rx="8" fill="none" stroke="#333" stroke-width="2.5"/>
+              <rect x="4" y="10" width="47" height="75" rx="2" fill="#f8f8f8"/>
+              <!-- Camera notch -->
+              <circle cx="27" cy="5" r="2" fill="#999"/>
+              <!-- QR code on screen -->
+              <rect x="12" y="20" width="31" height="31" rx="2" fill="#fff" stroke="#333" stroke-width="1.5"/>
+              <!-- QR pattern -->
+              <rect x="15" y="23" width="7" height="7" fill="#333"/>
+              <rect x="33" y="23" width="7" height="7" fill="#333"/>
+              <rect x="15" y="41" width="7" height="7" fill="#333"/>
+              <rect x="24" y="30" width="3" height="3" fill="#333"/>
+              <rect x="29" y="33" width="3" height="3" fill="#333"/>
+              <rect x="24" y="36" width="3" height="3" fill="#333"/>
+              <rect x="33" y="38" width="4" height="4" fill="#333"/>
+              <rect x="26" y="43" width="3" height="3" fill="#333"/>
+              <!-- Scan me text -->
+              <text x="27" y="62" text-anchor="middle" font-size="5" fill="#0058a3" font-weight="bold">SCAN ME</text>
+              <!-- URL -->
+              <text x="27" y="78" text-anchor="middle" font-size="4" fill="#888">gallery.204.ai</text>
+            </g>
+
+            <!-- Arrow to gallery -->
+            <line x1="110" y1="70" x2="150" y2="70" stroke="#0058a3" stroke-width="2" stroke-dasharray="5 3"/>
+            <polygon points="150,64 163,70 150,76" fill="#0058a3"/>
+
+            <!-- Browser/Gallery -->
+            <g transform="translate(170, 8)">
+              <!-- Browser window -->
+              <rect x="0" y="0" width="180" height="125" rx="5" fill="none" stroke="#333" stroke-width="2.5"/>
+              <!-- Title bar -->
+              <rect x="0" y="0" width="180" height="18" rx="5" fill="#f0f0f0" stroke="#333" stroke-width="1"/>
+              <circle cx="12" cy="9" r="3" fill="#e74c3c"/>
+              <circle cx="22" cy="9" r="3" fill="#e0a800"/>
+              <circle cx="32" cy="9" r="3" fill="#4caf50"/>
+              <rect x="50" y="5" width="80" height="8" rx="3" fill="#fff" stroke="#ddd" stroke-width="1"/>
+              <text x="90" y="12" text-anchor="middle" font-size="5" fill="#aaa">gallery.204.ai/kiosk-42</text>
+
+              <!-- Gallery header -->
+              <text x="90" y="32" text-anchor="middle" font-size="7" fill="#0058a3" font-weight="bold">204.ai PHOTÖBOOTH</text>
+              <text x="90" y="40" text-anchor="middle" font-size="5" fill="#999">Kiosk #42 — Today's Gallery</text>
+
+              <!-- Photo grid -->
+              <rect x="10" y="46" width="36" height="32" rx="2" fill="#e8f0fe" stroke="#0058a3" stroke-width="0.8"/>
+              <circle cx="28" cy="56" r="6" fill="none" stroke="#0058a3" stroke-width="1"/>
+              <path d="M22 53 L24 50 L27 52 L28 48 L29 52 L32 50 L34 53" fill="none" stroke="#e0a800" stroke-width="0.8"/>
+
+              <rect x="52" y="46" width="36" height="32" rx="2" fill="#fff8e0" stroke="#0058a3" stroke-width="0.8"/>
+              <circle cx="70" cy="56" r="6" fill="none" stroke="#0058a3" stroke-width="1"/>
+              <circle cx="68" cy="55" r="1" fill="#0058a3"/>
+              <circle cx="72" cy="55" r="1" fill="#0058a3"/>
+
+              <rect x="94" y="46" width="36" height="32" rx="2" fill="#e8f0fe" stroke="#0058a3" stroke-width="0.8"/>
+              <circle cx="112" cy="56" r="6" fill="none" stroke="#0058a3" stroke-width="1"/>
+              <circle cx="110" cy="55" r="1" fill="#0058a3"/>
+              <circle cx="114" cy="55" r="1" fill="#0058a3"/>
+
+              <rect x="136" y="46" width="36" height="32" rx="2" fill="#fff8e0" stroke="#0058a3" stroke-width="0.8"/>
+              <circle cx="154" cy="56" r="6" fill="none" stroke="#0058a3" stroke-width="1"/>
+
+              <!-- Second row -->
+              <rect x="10" y="82" width="36" height="32" rx="2" fill="#fff8e0" stroke="#0058a3" stroke-width="0.8"/>
+              <rect x="52" y="82" width="36" height="32" rx="2" fill="#e8f0fe" stroke="#0058a3" stroke-width="0.8"/>
+              <rect x="94" y="82" width="36" height="32" rx="2" fill="#fff8e0" stroke="#0058a3" stroke-width="0.8"/>
+              <rect x="136" y="82" width="36" height="32" rx="2" fill="#e8f0fe" stroke="#0058a3" stroke-width="0.8"/>
+
+              <!-- Share/download icons -->
+              <text x="90" y="122" text-anchor="middle" font-size="5" fill="#0058a3">↓ Download · Share · ♥ Like</text>
+            </g>
+
+            <!-- Happy person with phone -->
+            <g transform="translate(373, 100)" class="float">
+              <!-- Share icon -->
+              <circle cx="0" cy="-10" r="8" fill="none" stroke="#0058a3" stroke-width="1.5"/>
+              <text x="0" y="-7" text-anchor="middle" font-size="8" fill="#0058a3">↗</text>
+            </g>
+
+            <!-- Floor -->
+            <line x1="0" y1="155" x2="400" y2="155" stroke="#ddd" stroke-width="1"/>
+          </svg>
+        </div>
+        <div class="step-text">
+          Scan the QR code to find your portrait in the branded online gallery <strong>G</strong>.
+          Download, share, or show your friends. Each kiosk has its own gallery page.
+          <strong>H</strong> (Joy) is now activated.
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 7: Morphing Video (Bonus) -->
+    <div class="step">
+      <div class="step-number">7</div>
+      <div class="step-content">
+        <div class="step-illustration">
+          <svg width="400" height="160" viewBox="0 0 400 160">
+            <!-- Film strip -->
+            <g transform="translate(20, 30)">
+              <!-- Film border -->
+              <rect x="0" y="0" width="360" height="100" rx="4" fill="none" stroke="#333" stroke-width="2"/>
+              <!-- Sprocket holes top -->
+              <rect x="10" y="5" width="8" height="10" rx="2" fill="#eee" stroke="#999" stroke-width="1"/>
+              <rect x="80" y="5" width="8" height="10" rx="2" fill="#eee" stroke="#999" stroke-width="1"/>
+              <rect x="150" y="5" width="8" height="10" rx="2" fill="#eee" stroke="#999" stroke-width="1"/>
+              <rect x="220" y="5" width="8" height="10" rx="2" fill="#eee" stroke="#999" stroke-width="1"/>
+              <rect x="290" y="5" width="8" height="10" rx="2" fill="#eee" stroke="#999" stroke-width="1"/>
+              <!-- Sprocket holes bottom -->
+              <rect x="10" y="85" width="8" height="10" rx="2" fill="#eee" stroke="#999" stroke-width="1"/>
+              <rect x="80" y="85" width="8" height="10" rx="2" fill="#eee" stroke="#999" stroke-width="1"/>
+              <rect x="150" y="85" width="8" height="10" rx="2" fill="#eee" stroke="#999" stroke-width="1"/>
+              <rect x="220" y="85" width="8" height="10" rx="2" fill="#eee" stroke="#999" stroke-width="1"/>
+              <rect x="290" y="85" width="8" height="10" rx="2" fill="#eee" stroke="#999" stroke-width="1"/>
+
+              <!-- Frame 1: Normal face -->
+              <rect x="28" y="20" width="50" height="60" rx="2" fill="#f5f5f5" stroke="#ccc" stroke-width="1"/>
+              <circle cx="53" cy="42" r="10" fill="none" stroke="#999" stroke-width="1.5"/>
+              <circle cx="50" cy="40" r="1.5" fill="#999"/>
+              <circle cx="56" cy="40" r="1.5" fill="#999"/>
+              <path d="M49 47 Q53 50 57 47" fill="none" stroke="#999" stroke-width="1"/>
+
+              <!-- Frame 2: Morphing -->
+              <rect x="93" y="20" width="50" height="60" rx="2" fill="#f0f4ff" stroke="#ccc" stroke-width="1"/>
+              <circle cx="118" cy="42" r="10" fill="none" stroke="#6688cc" stroke-width="1.5"/>
+              <circle cx="115" cy="40" r="1.5" fill="#6688cc"/>
+              <circle cx="121" cy="40" r="1.5" fill="#6688cc"/>
+              <path d="M113 47 Q118 51 123 47" fill="none" stroke="#6688cc" stroke-width="1"/>
+              <!-- Swirl effect -->
+              <circle cx="118" cy="42" r="16" fill="none" stroke="#0058a3" stroke-width="0.5" opacity="0.4" stroke-dasharray="3 3">
+                <animateTransform attributeName="transform" type="rotate" from="0 118 42" to="360 118 42" dur="3s" repeatCount="indefinite"/>
+              </circle>
+
+              <!-- Frame 3: More morphed -->
+              <rect x="158" y="20" width="50" height="60" rx="2" fill="#eef0ff" stroke="#ccc" stroke-width="1"/>
+              <circle cx="183" cy="40" r="10" fill="none" stroke="#4466bb" stroke-width="1.5"/>
+              <!-- Crown appearing -->
+              <path d="M173 34 L176 28 L180 32 L183 25 L186 32 L190 28 L193 34" fill="none" stroke="#e0a800" stroke-width="1.2"/>
+              <circle cx="180" cy="38" r="1.5" fill="#4466bb"/>
+              <circle cx="186" cy="38" r="1.5" fill="#4466bb"/>
+              <path d="M178 45 Q183 50 188 45" fill="none" stroke="#4466bb" stroke-width="1.5"/>
+
+              <!-- Frame 4: Fully transformed -->
+              <rect x="223" y="20" width="50" height="60" rx="2" fill="#e8f0fe" stroke="#0058a3" stroke-width="1.5"/>
+              <circle cx="248" cy="40" r="10" fill="none" stroke="#0058a3" stroke-width="2"/>
+              <path d="M238 34 L242 26 L245 32 L248 22 L251 32 L254 26 L258 34" fill="none" stroke="#e0a800" stroke-width="1.5"/>
+              <circle cx="245" cy="38" r="2" fill="#0058a3"/>
+              <circle cx="251" cy="38" r="2" fill="#0058a3"/>
+              <path d="M243 46 Q248 52 253 46" fill="none" stroke="#0058a3" stroke-width="2"/>
+              <!-- Sparkle -->
+              <polygon points="260,25 262,29 266,29 263,32 264,36 260,33 256,36 257,32 254,29 258,29" fill="#e0a800"/>
+
+              <!-- Play triangle overlay -->
+              <polygon points="300,35 300,65 325,50" fill="#0058a3" opacity="0.15"/>
+              <polygon points="305,40 305,60 320,50" fill="#0058a3" opacity="0.4"/>
+            </g>
+
+            <!-- Label -->
+            <text x="200" y="150" text-anchor="middle" font-size="10" fill="#888" font-weight="bold" letter-spacing="2">BONUS: MORPH VIDEO (24 FPS)</text>
+          </svg>
+        </div>
+        <div class="step-text">
+          <strong>BONUS LEVEL:</strong> Two portraits are morphed into a video using LTX Video AI.
+          Watch yourself transform frame by frame.
+          Send to smart glasses <strong>or</strong> share as a keepsake.
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Result -->
+  <div class="result">
+    <svg width="60" height="60" viewBox="0 0 60 60" style="margin-bottom: 10px;">
+      <circle cx="30" cy="30" r="25" fill="none" stroke="#0058a3" stroke-width="2"/>
+      <path d="M18 30 L26 38 L42 22" fill="none" stroke="#0058a3" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <h2>FÄRDIG! (Complete!)</h2>
+    <p>Your AI Photobooth is now assembled. No allen wrench required.</p>
+    <p style="margin-top: 8px; font-size: 12px; color: #999;">Leftover parts? That's normal. Probably just extra joy.</p>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <div class="brand">204.ai</div>
+    <p>Interactive Design Studio — Lisbon</p>
+    <p style="margin-top: 4px;">© 2026 — Designed with ✨ and GPU heat</p>
+    <p style="margin-top: 8px; font-size: 10px;">Inter IKEA Systems B.V. did NOT approve this. They probably would though.</p>
+  </div>
+
+</div>
+
+</body>
+</html>

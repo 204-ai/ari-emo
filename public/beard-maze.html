@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Beard Quest</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1a1a2e;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    font-family: 'Courier New', monospace;
+    color: #e0e0e0;
+    overflow: hidden;
+  }
+  h1 {
+    font-size: 24px;
+    margin-bottom: 8px;
+    color: #f0c040;
+    text-shadow: 0 0 10px rgba(240, 192, 64, 0.5);
+  }
+  #hud {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 12px;
+    font-size: 16px;
+  }
+  #hud span { color: #f0c040; }
+  #beard-collection {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    min-height: 36px;
+    align-items: center;
+  }
+  .beard-slot {
+    width: 32px;
+    height: 32px;
+    border: 2px solid #333;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    background: #16213e;
+  }
+  .beard-slot.collected {
+    border-color: #f0c040;
+    background: #1a1a2e;
+    box-shadow: 0 0 8px rgba(240, 192, 64, 0.3);
+  }
+  canvas {
+    border: 2px solid #f0c040;
+    border-radius: 4px;
+    box-shadow: 0 0 20px rgba(240, 192, 64, 0.2);
+    image-rendering: pixelated;
+  }
+  #message {
+    margin-top: 12px;
+    font-size: 14px;
+    color: #aaa;
+    height: 20px;
+  }
+  #win-screen {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.85);
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+  }
+  #win-screen.show { display: flex; }
+  #win-screen h2 {
+    font-size: 48px;
+    color: #f0c040;
+    margin-bottom: 16px;
+    text-shadow: 0 0 20px rgba(240, 192, 64, 0.8);
+  }
+  #win-screen p { font-size: 20px; margin-bottom: 24px; }
+  #win-screen .final-char { font-size: 80px; margin-bottom: 16px; }
+  #restart-btn {
+    padding: 12px 32px;
+    font-size: 18px;
+    font-family: 'Courier New', monospace;
+    background: #f0c040;
+    color: #1a1a2e;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+  }
+  #restart-btn:hover { background: #ffd060; }
+  #instructions {
+    margin-top: 8px;
+    font-size: 12px;
+    color: #666;
+  }
+</style>
+</head>
+<body>
+
+<h1>Beard Quest</h1>
+<div id="hud">
+  Beards: <span id="score">0</span> / <span id="total">0</span>
+  &nbsp;&nbsp; Level: <span id="level">1</span>
+</div>
+<div id="beard-collection"></div>
+<canvas id="game"></canvas>
+<div id="message">Arrow keys or WASD to move. Collect all the beards!</div>
+<div id="instructions">Press R to restart level</div>
+
+<div id="win-screen">
+  <div class="final-char" id="final-char"></div>
+  <h2>BEARD MASTER!</h2>
+  <p>You collected every beard!</p>
+  <button id="restart-btn" onclick="nextLevel()">Next Level</button>
+</div>
+
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+const TILE = 32;
+const COLS = 21;
+const ROWS = 15;
+canvas.width = COLS * TILE;
+canvas.height = ROWS * TILE;
+
+// Beard types with emoji and name
+const BEARD_TYPES = [
+  { emoji: '🧔', name: 'Classic Full', color: '#8B4513' },
+  { emoji: '🥸', name: 'Disguise Stache', color: '#654321' },
+  { emoji: '🧙', name: 'Wizard Beard', color: '#C0C0C0' },
+  { emoji: '🎅', name: 'Santa Beard', color: '#FFFFFF' },
+  { emoji: '🤠', name: 'Cowboy Stache', color: '#D2691E' },
+  { emoji: '🏴‍☠️', name: 'Pirate Beard', color: '#1a1a1a' },
+  { emoji: '👨‍🎤', name: 'Rockstar Goatee', color: '#FF4500' },
+  { emoji: '🧝', name: 'Elven Beard', color: '#FFD700' },
+];
+
+let currentLevel = 1;
+let player = { x: 1, y: 1 };
+let collectedBeards = [];
+let beards = [];
+let maze = [];
+let gameWon = false;
+
+// Player appearance stages (changes with each beard collected)
+const PLAYER_FACES = [
+  { body: '#f0c040', face: '😶' },   // no beard
+  { body: '#f0c040', face: '😐' },   // 1 beard
+  { body: '#f0c040', face: '🧔' },   // 2 beards
+  { body: '#f0c040', face: '🥸' },   // 3 beards
+  { body: '#f0c040', face: '🧙' },   // 4 beards
+  { body: '#f0c040', face: '🎅' },   // 5 beards
+  { body: '#f0c040', face: '🤠' },   // 6 beards
+  { body: '#f0c040', face: '👨‍🎤' },  // 7 beards
+  { body: '#FFD700', face: '🧝' },   // 8 beards - final form
+];
+
+function generateMaze(cols, rows) {
+  // Initialize grid with all walls
+  const grid = Array.from({ length: rows }, () => Array(cols).fill(1));
+
+  // Recursive backtracker
+  function carve(x, y) {
+    grid[y][x] = 0;
+    const dirs = [[0,-2],[0,2],[-2,0],[2,0]].sort(() => Math.random() - 0.5);
+    for (const [dx, dy] of dirs) {
+      const nx = x + dx, ny = y + dy;
+      if (nx > 0 && nx < cols - 1 && ny > 0 && ny < rows - 1 && grid[ny][nx] === 1) {
+        grid[y + dy/2][x + dx/2] = 0;
+        carve(nx, ny);
+      }
+    }
+  }
+
+  carve(1, 1);
+
+  // Open some extra passages for less claustrophobic mazes
+  const extraPaths = Math.floor((cols * rows) * 0.04);
+  for (let i = 0; i < extraPaths; i++) {
+    const rx = 1 + Math.floor(Math.random() * (cols - 2));
+    const ry = 1 + Math.floor(Math.random() * (rows - 2));
+    if (grid[ry][rx] === 1) {
+      // Check if removing this wall connects two open spaces
+      let openNeighbors = 0;
+      if (ry > 0 && grid[ry-1][rx] === 0) openNeighbors++;
+      if (ry < rows-1 && grid[ry+1][rx] === 0) openNeighbors++;
+      if (rx > 0 && grid[ry][rx-1] === 0) openNeighbors++;
+      if (rx < cols-1 && grid[ry][rx+1] === 0) openNeighbors++;
+      if (openNeighbors >= 2) grid[ry][rx] = 0;
+    }
+  }
+
+  return grid;
+}
+
+function placeBeards() {
+  const open = [];
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      if (maze[y][x] === 0 && !(x === 1 && y === 1)) {
+        open.push({ x, y });
+      }
+    }
+  }
+  // Shuffle and pick beard positions
+  open.sort(() => Math.random() - 0.5);
+  const numBeards = Math.min(BEARD_TYPES.length, 3 + currentLevel * 1);
+  const placed = [];
+  for (let i = 0; i < numBeards && i < open.length; i++) {
+    placed.push({
+      x: open[i].x,
+      y: open[i].y,
+      type: BEARD_TYPES[i % BEARD_TYPES.length],
+      collected: false,
+    });
+  }
+  return placed;
+}
+
+function initLevel() {
+  gameWon = false;
+  document.getElementById('win-screen').classList.remove('show');
+  player = { x: 1, y: 1 };
+  collectedBeards = [];
+  maze = generateMaze(COLS, ROWS);
+  beards = placeBeards();
+
+  document.getElementById('level').textContent = currentLevel;
+  document.getElementById('total').textContent = beards.length;
+  document.getElementById('score').textContent = 0;
+  updateBeardSlots();
+  draw();
+}
+
+function updateBeardSlots() {
+  const container = document.getElementById('beard-collection');
+  container.innerHTML = '';
+  beards.forEach((b, i) => {
+    const slot = document.createElement('div');
+    slot.className = 'beard-slot' + (b.collected ? ' collected' : '');
+    slot.textContent = b.collected ? b.type.emoji : '?';
+    slot.title = b.collected ? b.type.name : 'Unknown beard';
+    container.appendChild(slot);
+  });
+}
+
+function draw() {
+  // Background
+  ctx.fillStyle = '#16213e';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Maze
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      if (maze[y][x] === 1) {
+        ctx.fillStyle = '#0f3460';
+        ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
+        // Wall edge highlight
+        ctx.fillStyle = '#1a4a7a';
+        ctx.fillRect(x * TILE, y * TILE, TILE, 2);
+        ctx.fillRect(x * TILE, y * TILE, 2, TILE);
+      } else {
+        // Floor
+        ctx.fillStyle = '#1a1a2e';
+        ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
+        // Subtle floor pattern
+        if ((x + y) % 2 === 0) {
+          ctx.fillStyle = '#1e1e35';
+          ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
+        }
+      }
+    }
+  }
+
+  // Beards
+  for (const b of beards) {
+    if (!b.collected) {
+      // Glow effect
+      ctx.save();
+      ctx.shadowColor = b.type.color;
+      ctx.shadowBlur = 10 + Math.sin(Date.now() / 300) * 5;
+      ctx.font = '22px serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(b.type.emoji, b.x * TILE + TILE/2, b.y * TILE + TILE/2);
+      ctx.restore();
+    }
+  }
+
+  // Player
+  const pFace = PLAYER_FACES[Math.min(collectedBeards.length, PLAYER_FACES.length - 1)];
+  // Player glow
+  ctx.save();
+  ctx.shadowColor = '#f0c040';
+  ctx.shadowBlur = 8;
+  ctx.font = '26px serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(pFace.face, player.x * TILE + TILE/2, player.y * TILE + TILE/2);
+  ctx.restore();
+}
+
+function movePlayer(dx, dy) {
+  if (gameWon) return;
+  const nx = player.x + dx;
+  const ny = player.y + dy;
+  if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS) return;
+  if (maze[ny][nx] === 1) return;
+
+  player.x = nx;
+  player.y = ny;
+
+  // Check beard collection
+  for (const b of beards) {
+    if (!b.collected && b.x === nx && b.y === ny) {
+      b.collected = true;
+      collectedBeards.push(b.type);
+      document.getElementById('score').textContent = collectedBeards.length;
+      document.getElementById('message').textContent =
+        `Collected: ${b.type.name}! ${b.type.emoji}`;
+      updateBeardSlots();
+
+      // Check win
+      if (collectedBeards.length === beards.length) {
+        gameWon = true;
+        setTimeout(showWin, 300);
+      }
+      break;
+    }
+  }
+
+  draw();
+}
+
+function showWin() {
+  const face = PLAYER_FACES[Math.min(collectedBeards.length, PLAYER_FACES.length - 1)];
+  document.getElementById('final-char').textContent = face.face;
+  document.getElementById('win-screen').classList.add('show');
+}
+
+function nextLevel() {
+  currentLevel++;
+  initLevel();
+}
+
+// Input
+document.addEventListener('keydown', (e) => {
+  switch (e.key) {
+    case 'ArrowUp':    case 'w': case 'W': e.preventDefault(); movePlayer(0, -1); break;
+    case 'ArrowDown':  case 's': case 'S': e.preventDefault(); movePlayer(0, 1);  break;
+    case 'ArrowLeft':  case 'a': case 'A': e.preventDefault(); movePlayer(-1, 0); break;
+    case 'ArrowRight': case 'd': case 'D': e.preventDefault(); movePlayer(1, 0);  break;
+    case 'r': case 'R': initLevel(); break;
+  }
+});
+
+// Touch controls for mobile
+let touchStartX, touchStartY;
+canvas.addEventListener('touchstart', (e) => {
+  touchStartX = e.touches[0].clientX;
+  touchStartY = e.touches[0].clientY;
+  e.preventDefault();
+});
+canvas.addEventListener('touchend', (e) => {
+  if (!touchStartX) return;
+  const dx = e.changedTouches[0].clientX - touchStartX;
+  const dy = e.changedTouches[0].clientY - touchStartY;
+  if (Math.abs(dx) > Math.abs(dy)) {
+    movePlayer(dx > 0 ? 1 : -1, 0);
+  } else {
+    movePlayer(0, dy > 0 ? 1 : -1);
+  }
+  touchStartX = null;
+  e.preventDefault();
+});
+
+// Animate beard glow
+function animate() {
+  if (!gameWon) draw();
+  requestAnimationFrame(animate);
+}
+
+initLevel();
+animate();
+</script>
+</body>
+</html>
