@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+// expanded state is now controlled by parent (accordion)
 
 interface TelegramMessage {
   id: number;
@@ -13,8 +14,12 @@ interface TelegramMessage {
   hasMedia: boolean;
 }
 
-export default function TelegramPane() {
-  const [expanded, setExpanded] = useState(false);
+interface TelegramPaneProps {
+  expanded: boolean;
+  onToggle: () => void;
+}
+
+export default function TelegramPane({ expanded, onToggle }: TelegramPaneProps) {
   const [messages, setMessages] = useState<TelegramMessage[]>([]);
   const [lastId, setLastId] = useState(0);
   const [unread, setUnread] = useState(0);
@@ -76,7 +81,7 @@ export default function TelegramPane() {
   return (
     <div className="w-full px-4">
       <button
-        onClick={() => setExpanded(!expanded)}
+        onClick={onToggle}
         className="w-full flex items-center justify-between px-3 py-2 rounded-lg
                    bg-zinc-800/50 hover:bg-zinc-800 transition-colors text-sm"
       >

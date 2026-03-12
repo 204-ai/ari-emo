@@ -3,15 +3,22 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import ChatPane from "./components/ChatPane";
 import HamsterPane from "./components/HamsterPane";
+import EmotionPane from "./components/EmotionPane";
 import SkillsPane from "./components/SkillsPane";
 import TelegramPane from "./components/TelegramPane";
 
 export type HamsterState = "idle" | "thinking" | "talking";
 
+type Panel = "emotions" | "telegram" | "skills" | null;
+
 export default function Home() {
   const [splitPercent, setSplitPercent] = useState(50);
   const [hamsterState, setHamsterState] = useState<HamsterState>("idle");
+  const [activePanel, setActivePanel] = useState<Panel>(null);
   const dragging = useRef(false);
+
+  const toggle = (panel: Panel) =>
+    setActivePanel((prev) => (prev === panel ? null : panel));
 
   const onMouseDown = useCallback(() => {
     dragging.current = true;
@@ -49,13 +56,25 @@ export default function Home() {
         onMouseDown={onMouseDown}
         className="w-1.5 bg-zinc-800 hover:bg-zinc-600 cursor-col-resize transition-colors flex-shrink-0"
       />
-      <div style={{ width: `${100 - splitPercent}%` }} className="flex flex-col items-center h-full">
-        <div className="flex-1 flex items-center justify-center">
-          <HamsterPane hamsterState={hamsterState} setHamsterState={setHamsterState} />
+      <div style={{ width: `${100 - splitPercent}%` }} className="flex flex-col items-center h-screen overflow-hidden">
+        <div className="flex-1 min-h-0 flex items-center justify-center">
+          <HamsterPane hamsterState={hamsterState} />
         </div>
-        <div className="w-full pb-4 space-y-2">
-          <TelegramPane />
-          <SkillsPane />
+        <div className="w-full pb-4 space-y-1 overflow-y-auto max-h-[60vh] flex-shrink-0 scrollbar-thin scrollbar-thumb-zinc-700">
+          <EmotionPane
+            expanded={activePanel === "emotions"}
+            onToggle={() => toggle("emotions")}
+            hamsterState={hamsterState}
+            setHamsterState={setHamsterState}
+          />
+          <TelegramPane
+            expanded={activePanel === "telegram"}
+            onToggle={() => toggle("telegram")}
+          />
+          <SkillsPane
+            expanded={activePanel === "skills"}
+            onToggle={() => toggle("skills")}
+          />
         </div>
       </div>
     </main>

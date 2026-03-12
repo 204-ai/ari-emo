@@ -240,10 +240,9 @@ function buildHamster(frame: EmotionFrame): string {
 
 interface HamsterPaneProps {
   hamsterState: HamsterState;
-  setHamsterState: (state: HamsterState) => void;
 }
 
-export default function HamsterPane({ hamsterState, setHamsterState }: HamsterPaneProps) {
+export default function HamsterPane({ hamsterState }: HamsterPaneProps) {
   const [emotion, setEmotion] = useState<Emotion>("neutral");
   const [visible, setVisible] = useState(true);
   const [frame, setFrame] = useState(0);
@@ -307,36 +306,12 @@ export default function HamsterPane({ hamsterState, setHamsterState }: HamsterPa
     return () => clearInterval(timer);
   }, [hamsterState]);
 
-  const handleClick = async (e: Emotion) => {
-    await fetch("/api/emotion", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ emotion: e }),
-    });
-    setVisible(false);
-    setTimeout(() => {
-      setEmotion(e);
-      setFrame(0);
-      frameRef.current = 0;
-      setVisible(true);
-    }, 200);
-  };
-
-  const setStateAPI = (state: HamsterState) => {
-    setHamsterState(state);
-    fetch("/api/emotion", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ state }),
-    }).catch(() => {});
-  };
-
   const config = EMOTION_MAP[emotion];
   const currentFrame = config.frames[frame % config.frames.length];
   const thoughtContent = THOUGHT_CONTENT[emotion];
 
   return (
-    <div className="flex flex-col items-center gap-8 p-8">
+    <div className="flex flex-col items-center gap-4 p-4">
       <h1 className="text-2xl font-bold text-zinc-300">Ari Emo</h1>
 
       {/* Animated state indicator */}
@@ -395,44 +370,6 @@ export default function HamsterPane({ hamsterState, setHamsterState }: HamsterPa
           </span>
         )}
       </p>
-
-      <div className="flex flex-wrap justify-center gap-2 max-w-md">
-        {EMOTIONS.map((e) => (
-          <button
-            key={e}
-            onClick={() => handleClick(e)}
-            className={`px-3 py-1.5 rounded text-sm transition-colors ${
-              emotion === e
-                ? "text-zinc-900 font-semibold"
-                : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
-            }`}
-            style={
-              emotion === e
-                ? { backgroundColor: EMOTION_MAP[e].color }
-                : undefined
-            }
-          >
-            {e}
-          </button>
-        ))}
-      </div>
-
-      {/* State test buttons */}
-      <div className="flex gap-2 mt-2">
-        {(["idle", "thinking", "talking"] as HamsterState[]).map((s) => (
-          <button
-            key={s}
-            onClick={() => setStateAPI(s)}
-            className={`px-2 py-1 rounded text-xs transition-colors ${
-              hamsterState === s
-                ? "bg-zinc-600 text-zinc-100"
-                : "bg-zinc-800/50 text-zinc-500 hover:text-zinc-300"
-            }`}
-          >
-            {s}
-          </button>
-        ))}
-      </div>
 
       {/* CSS for animations */}
       <style jsx>{`

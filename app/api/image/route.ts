@@ -32,6 +32,8 @@ export async function GET(request: Request) {
       mov: "video/quicktime",
       glb: "model/gltf-binary",
       gltf: "model/gltf+json",
+      wav: "audio/wav",
+      mp3: "audio/mpeg",
     };
     const mime = mimeMap[ext ?? ""] || "application/octet-stream";
 

@@ -27,11 +27,10 @@ function isModelUrl(url: string) {
   return /\.(glb|gltf)(\?|$)/i.test(url);
 }
 
-/** Ensure Google model-viewer script is loaded. */
-let modelViewerLoaded = false;
+/** Ensure Google model-viewer script is loaded (shared guard with SkillsPane). */
 function ensureModelViewer() {
-  if (modelViewerLoaded) return;
-  modelViewerLoaded = true;
+  if (typeof window === "undefined") return;
+  if (document.querySelector('script[src*="model-viewer"]')) return;
   const script = document.createElement("script");
   script.type = "module";
   script.src =
